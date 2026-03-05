@@ -101,7 +101,7 @@ export const CATEGORIES = [
   'Trash',
   'Water',
   // Special
-  'Payment',
+  'Payment'
 ] as const;
 
 export const CURRENCIES = [

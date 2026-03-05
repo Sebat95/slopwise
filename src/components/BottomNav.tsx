@@ -1,11 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Receipt,
-  Plus,
-  Scale,
-  Settings
-} from 'lucide-react';
+import { LayoutDashboard, Receipt, Plus, Scale, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Home', icon: LayoutDashboard },
@@ -33,7 +27,7 @@ export default function BottomNav() {
               <button
                 key={path}
                 onClick={() => navigate(path)}
-                className="flex flex-col items-center justify-center flex-1 h-full"
+                className="flex h-full flex-1 flex-col items-center justify-center"
               >
                 <div className="bg-primary hover:bg-primary-dark flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors">
                   <Icon size={22} className="text-white" strokeWidth={2.5} />
