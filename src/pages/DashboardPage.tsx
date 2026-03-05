@@ -13,8 +13,15 @@ import { PlusCircle, ArrowRight, Receipt, RefreshCw } from 'lucide-react';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { spreadsheetName, members, expenses, currency, isLoading, loadData } =
-    useApp();
+  const {
+    spreadsheetName,
+    members,
+    expenses,
+    currency,
+    isLoading,
+    loadData,
+    deleteExpense
+  } = useApp();
 
   useEffect(() => {
     if (expenses.length === 0 && !isLoading) {
@@ -29,6 +36,11 @@ export default function DashboardPage() {
   const totalExpenses = expenses
     .filter((e) => e.category !== 'Payment')
     .reduce((sum, e) => sum + e.cost, 0);
+
+  const handleEdit = (id: string) => navigate(`/edit/${id}`);
+  const handleDelete = (id: string) => {
+    if (window.confirm('Delete this expense?')) deleteExpense(id);
+  };
 
   if (isLoading && expenses.length === 0) {
     return (
@@ -185,7 +197,12 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-2">
               {recentExpenses.map((e) => (
-                <ExpenseCard key={e.id} expense={e} />
+                <ExpenseCard
+                  key={e.id}
+                  expense={e}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
               ))}
             </div>
           )}

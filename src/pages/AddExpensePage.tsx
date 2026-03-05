@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import { CATEGORIES, CURRENCIES, type SplitType } from '../types';
 import { calculateSplits } from '../utils/balance';
-import { todayStr, formatCurrency } from '../utils/format';
+import { todayStr, formatCurrency, getCategoryEmoji } from '../utils/format';
 import {
   ChevronLeft,
   Check,
@@ -18,7 +18,14 @@ import {
 
 export default function AddExpensePage() {
   const navigate = useNavigate();
-  const { members, currency, addExpense } = useApp();
+  const { id: editId } = useParams<{ id: string }>();
+  const { members, currency, expenses, addExpense, updateExpense } = useApp();
+
+  const existing = useMemo(
+    () => (editId ? expenses.find((e) => e.id === editId) : undefined),
+    [editId, expenses]
+  );
+  const isEdit = !!existing;
 
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -31,6 +38,41 @@ export default function AddExpensePage() {
   const [involved, setInvolved] = useState<Set<string>>(new Set(members));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!existing) return;
+    setDescription(existing.description);
+    setAmount(existing.cost.toString());
+    setDate(existing.date);
+    setCategory(existing.category);
+    setExpCurrency(existing.currency);
+    setPaidBy(existing.paidBy);
+    setSplitType(existing.splitType);
+
+    const involvedSet = new Set<string>();
+    const values: Record<string, number> = {};
+    for (const [m, net] of Object.entries(existing.splits)) {
+      if (Math.abs(net) > 0.001 || m === existing.paidBy) {
+        involvedSet.add(m);
+      }
+      const share = existing.paidBy === m ? existing.cost - net : -net;
+      if (share > 0) values[m] = Math.round(share * 100) / 100;
+    }
+    if (involvedSet.size === 0) involvedSet.add(existing.paidBy);
+    setInvolved(involvedSet);
+
+    if (existing.splitType === 'exact') {
+      setSplitValues(values);
+    } else if (existing.splitType === 'percentage' && existing.cost > 0) {
+      const pcts: Record<string, number> = {};
+      for (const [m, v] of Object.entries(values)) {
+        pcts[m] = Math.round((v / existing.cost) * 10000) / 100;
+      }
+      setSplitValues(pcts);
+    } else if (existing.splitType === 'shares') {
+      setSplitValues(values);
+    }
+  }, [existing]);
 
   const cost = parseFloat(amount) || 0;
 
@@ -103,7 +145,7 @@ export default function AddExpensePage() {
         splitValues,
         [...involved]
       );
-      await addExpense({
+      const expenseData = {
         date,
         description: description.trim(),
         category,
@@ -112,10 +154,16 @@ export default function AddExpensePage() {
         paidBy,
         splitType,
         splits
-      });
+      };
+
+      if (isEdit && editId) {
+        await updateExpense(editId, expenseData);
+      } else {
+        await addExpense(expenseData);
+      }
       navigate(-1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add expense');
+      setError(err instanceof Error ? err.message : 'Failed to save expense');
       setSaving(false);
     }
   };
@@ -126,7 +174,6 @@ export default function AddExpensePage() {
   return (
     <Layout showNav={false}>
       <div className="mx-auto max-w-lg px-4 py-4">
-        {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
@@ -135,7 +182,9 @@ export default function AddExpensePage() {
             <ChevronLeft size={20} />
             <span className="text-sm">Cancel</span>
           </button>
-          <h1 className="text-text-primary text-lg font-bold">Add Expense</h1>
+          <h1 className="text-text-primary text-lg font-bold">
+            {isEdit ? 'Edit Expense' : 'Add Expense'}
+          </h1>
           <button
             onClick={handleSave}
             disabled={saving}
@@ -220,7 +269,7 @@ export default function AddExpensePage() {
               >
                 {CATEGORIES.filter((c) => c !== 'Payment').map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {getCategoryEmoji(c)} {c}
                   </option>
                 ))}
               </select>
@@ -352,7 +401,6 @@ export default function AddExpensePage() {
               })}
             </div>
 
-            {/* Validation hints */}
             {splitType === 'exact' && cost > 0 && (
               <div className="text-text-muted mt-2 text-xs">
                 Total:{' '}
@@ -380,13 +428,12 @@ export default function AddExpensePage() {
             </div>
           )}
 
-          {/* Save Button (bottom) */}
           <button
             onClick={handleSave}
             disabled={saving}
             className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Add Expense'}
+            {saving ? 'Saving...' : isEdit ? 'Update Expense' : 'Add Expense'}
           </button>
         </div>
       </div>

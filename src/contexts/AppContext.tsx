@@ -25,6 +25,10 @@ interface AppContextValue extends AppState {
   selectSpreadsheet: (id: string, name: string) => void;
   loadData: () => Promise<void>;
   addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
+  updateExpense: (
+    expenseId: string,
+    updated: Omit<Expense, 'id'>
+  ) => Promise<void>;
   deleteExpense: (expenseId: string) => Promise<void>;
   addMember: (name: string) => Promise<void>;
   settleUp: (from: string, to: string, amount: number) => Promise<void>;
@@ -111,6 +115,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     },
     [state.members]
+  );
+
+  const updateExpense = useCallback(
+    async (expenseId: string, updated: Omit<Expense, 'id'>) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId) return;
+
+      const idx = state.expenses.findIndex((e) => e.id === expenseId);
+      if (idx < 0) return;
+
+      const updatedExpense: Expense = { ...updated, id: expenseId };
+      const backup = [...state.expenses];
+
+      setState((s) => ({
+        ...s,
+        expenses: s.expenses.map((e) =>
+          e.id === expenseId ? updatedExpense : e
+        ),
+        isSyncing: true
+      }));
+
+      try {
+        await sheetsApi.updateExpenseRow(
+          ssId,
+          idx,
+          updatedExpense,
+          state.members
+        );
+        setState((s) => ({ ...s, isSyncing: false }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          expenses: backup,
+          isSyncing: false,
+          error:
+            err instanceof Error ? err.message : 'Failed to update expense'
+        }));
+      }
+    },
+    [state.expenses, state.members]
   );
 
   const deleteExpense = useCallback(
@@ -265,6 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectSpreadsheet,
         loadData,
         addExpense,
+        updateExpense,
         deleteExpense,
         addMember,
         settleUp,

@@ -4,19 +4,28 @@ import {
   formatDateShort,
   getCategoryEmoji
 } from '../utils/format';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 
 interface Props {
   expense: Expense;
   currentUser?: string;
+  onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
 }
 
-export default function ExpenseCard({ expense, currentUser, onDelete }: Props) {
+export default function ExpenseCard({
+  expense,
+  currentUser,
+  onEdit,
+  onDelete
+}: Props) {
   const isSettlement = expense.category === 'Payment';
 
   return (
-    <div className="bg-bg-card border-border/50 hover:border-border group flex items-center gap-3 rounded-xl border p-3 transition-colors">
+    <div
+      className="bg-bg-card border-border/50 hover:border-border group flex items-center gap-3 rounded-xl border p-3 transition-colors cursor-pointer"
+      onClick={() => onEdit?.(expense.id)}
+    >
       <div className="bg-bg-surface flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg">
         {getCategoryEmoji(expense.category)}
       </div>
@@ -57,17 +66,30 @@ export default function ExpenseCard({ expense, currentUser, onDelete }: Props) {
           </div>
         )}
       </div>
-      {onDelete && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(expense.id);
-          }}
-          className="text-text-muted hover:text-danger hover:bg-danger/10 rounded-lg p-1.5 opacity-0 transition-all group-hover:opacity-100"
-        >
-          <Trash2 size={16} />
-        </button>
-      )}
+      <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        {onEdit && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(expense.id);
+            }}
+            className="text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg p-1.5 transition-colors"
+          >
+            <Pencil size={14} />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(expense.id);
+            }}
+            className="text-text-muted hover:text-danger hover:bg-danger/10 rounded-lg p-1.5 transition-colors"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

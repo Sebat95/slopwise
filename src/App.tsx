@@ -80,6 +80,16 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/edit/:id"
+        element={
+          <AuthGuard>
+            <SheetGuard>
+              <AddExpensePage />
+            </SheetGuard>
+          </AuthGuard>
+        }
+      />
+      <Route
         path="/balances"
         element={
           <AuthGuard>

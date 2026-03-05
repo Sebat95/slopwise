@@ -256,6 +256,23 @@ export async function clearSheet(spreadsheetId: string): Promise<void> {
   );
 }
 
+export async function updateExpenseRow(
+  spreadsheetId: string,
+  rowIndex: number,
+  expense: Expense,
+  members: string[]
+): Promise<void> {
+  const row = expenseToRow(expense, members);
+  const rowNum = rowIndex + 2;
+  await apiRequest(
+    `${SHEETS_API}/${spreadsheetId}/values/Expenses!A${rowNum}:ZZ${rowNum}?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ values: [row] })
+    }
+  );
+}
+
 export async function deleteExpenseRow(
   spreadsheetId: string,
   rowIndex: number

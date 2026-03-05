@@ -6,6 +6,7 @@ import ExpenseCard from '../components/ExpenseCard';
 import EmptyState from '../components/EmptyState';
 import { Search, Receipt, PlusCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { getCategoryEmoji } from '../utils/format';
 
 export default function ExpensesPage() {
   const navigate = useNavigate();
@@ -42,6 +43,7 @@ export default function ExpensesPage() {
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
   }, [filtered]);
 
+  const handleEdit = (id: string) => navigate(`/edit/${id}`);
   const handleDelete = (id: string) => {
     if (window.confirm('Delete this expense?')) deleteExpense(id);
   };
@@ -81,7 +83,7 @@ export default function ExpensesPage() {
           >
             {categories.map((c) => (
               <option key={c} value={c}>
-                {c === 'all' ? 'All' : c}
+                {c === 'all' ? 'All' : `${getCategoryEmoji(c)} ${c}`}
               </option>
             ))}
           </select>
@@ -123,6 +125,7 @@ export default function ExpensesPage() {
                     <ExpenseCard
                       key={e.id}
                       expense={e}
+                      onEdit={handleEdit}
                       onDelete={handleDelete}
                     />
                   ))}
