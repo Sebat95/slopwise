@@ -1,5 +1,6 @@
-import type { SpreadsheetInfo, Expense, SheetData } from '../types';
+import type { SpreadsheetInfo, Expense, SheetData, MemberInfo } from '../types';
 import { getAccessToken } from './google-auth';
+import { normalizeCategory } from '../utils/format';
 import { v4 as uuidv4 } from 'uuid';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -180,7 +181,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     }
 
     const cost = parseFloat(row[3] || '0');
-    const category = row[2] || 'General';
+    const category = normalizeCategory(row[2] || 'General');
 
     expenses.push({
       id: uuidv4(),
@@ -322,6 +323,54 @@ export async function deleteExpenseRow(
       ]
     })
   });
+}
+
+export async function readMemberProfiles(spreadsheetId: string): Promise<MemberInfo[]> {
+  const data = await apiRequest<{ values?: string[][] }>(
+    `${SHEETS_API}/${spreadsheetId}/values/_members!A2:C100`
+  ).catch(() => ({ values: undefined }));
+
+  if (!data.values) return [];
+  return data.values
+    .filter((r) => r[0])
+    .map((r) => ({ name: r[0], email: r[1] || '', photoUrl: r[2] || '' }));
+}
+
+export async function saveMemberProfile(
+  spreadsheetId: string,
+  member: MemberInfo
+): Promise<void> {
+  const info = await getSpreadsheetInfo(spreadsheetId);
+  if (!info.sheets.includes('_members')) {
+    await apiRequest(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+      method: 'POST',
+      body: JSON.stringify({
+        requests: [{ addSheet: { properties: { title: '_members' } } }]
+      })
+    });
+    await apiRequest(
+      `${SHEETS_API}/${spreadsheetId}/values/_members!A1:C1?valueInputOption=USER_ENTERED`,
+      { method: 'PUT', body: JSON.stringify({ values: [['Name', 'Email', 'PhotoURL']] }) }
+    );
+  }
+
+  const existing = await readMemberProfiles(spreadsheetId);
+  const idx = existing.findIndex(
+    (m) => m.name === member.name || m.email === member.email
+  );
+
+  if (idx >= 0) {
+    const rowNum = idx + 2;
+    await apiRequest(
+      `${SHEETS_API}/${spreadsheetId}/values/_members!A${rowNum}:C${rowNum}?valueInputOption=USER_ENTERED`,
+      { method: 'PUT', body: JSON.stringify({ values: [[member.name, member.email, member.photoUrl]] }) }
+    );
+  } else {
+    await apiRequest(
+      `${SHEETS_API}/${spreadsheetId}/values/_members!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      { method: 'POST', body: JSON.stringify({ values: [[member.name, member.email, member.photoUrl]] }) }
+    );
+  }
 }
 
 export async function initializeSheetIfNeeded(

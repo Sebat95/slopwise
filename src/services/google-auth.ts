@@ -2,7 +2,9 @@ import type { GoogleTokenInfo } from '../types';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
-  'https://www.googleapis.com/auth/drive.metadata.readonly'
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ');
 
 const SESSION_KEY = 'splitsheet_token';
@@ -117,6 +119,21 @@ export async function refreshToken(clientId: string): Promise<GoogleTokenInfo> {
   const existing = getStoredToken();
   if (existing) return existing;
   return signIn(clientId);
+}
+
+export async function fetchUserProfile(): Promise<{ name: string; email: string; picture: string } | null> {
+  const token = getAccessToken();
+  if (!token) return null;
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return { name: data.name || '', email: data.email || '', picture: data.picture || '' };
+  } catch {
+    return null;
+  }
 }
 
 export function signOut(): void {

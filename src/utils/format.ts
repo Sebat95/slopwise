@@ -77,73 +77,82 @@ export function getAvatarColor(name: string): string {
 }
 
 const CATEGORY_EMOJI: Record<string, string> = {
-  // General
-  General: '📋',
-  // Entertainment
-  'Entertainment - Other': '🎭',
-  Games: '🎮',
-  Movies: '🎬',
-  Music: '🎵',
-  Sports: '⚽',
-  // Food and drink
-  'Food and drink - Other': '🍽️',
+  'General': '📋',
+  'Groceries': '🛒',
   'Dining out': '🍕',
-  Groceries: '🛒',
-  Liquor: '🍷',
-  // Home
-  'Home - Other': '🏡',
-  Electronics: '📱',
-  Furniture: '🪑',
-  'Household supplies': '🧹',
-  Maintenance: '🔧',
-  Mortgage: '🏦',
-  Pets: '🐾',
-  Rent: '🏠',
-  Services: '🛠️',
-  // Life
-  'Life - Other': '🌿',
-  Childcare: '👶',
-  Clothing: '👕',
-  Education: '📚',
-  Gifts: '🎁',
-  Insurance: '🛡️',
-  'Medical expenses': '🏥',
-  Taxes: '💰',
-  // Transportation
-  'Transportation - Other': '🚗',
-  Bicycle: '🚲',
-  'Bus/train': '🚌',
-  Car: '🚙',
-  'Gas/fuel': '⛽',
-  Hotel: '🏨',
-  Parking: '🅿️',
-  Plane: '✈️',
-  Taxi: '🚕',
-  // Utilities
-  'Utilities - Other': '💡',
-  Cleaning: '🧽',
-  Electricity: '⚡',
-  'Heat/gas': '🔥',
-  'TV/Phone/Internet': '📡',
-  Trash: '🗑️',
-  Water: '💧',
-  // Special
-  Payment: '💸',
-
-  // Legacy aliases (old app categories → closest match)
-  Entertainment: '🎭',
-  'Food & Drink': '🍽️',
-  'Food and drink': '🍽️',
-  Home: '🏡',
-  Life: '🌿',
-  Transportation: '🚗',
-  Utilities: '💡',
-  Shopping: '🛍️',
-  Healthcare: '🏥',
-  Travel: '✈️',
-  Other: '📦'
+  'Drinks': '🍷',
+  'Rent': '🏠',
+  'Utilities': '💡',
+  'Household': '🏡',
+  'Transport': '🚗',
+  'Travel': '✈️',
+  'Entertainment': '🎬',
+  'Shopping': '🛍️',
+  'Healthcare': '🏥',
+  'Education': '📚',
+  'Gifts': '🎁',
+  'Insurance': '🛡️',
+  'Taxes': '💰',
+  'Sports': '⚽',
+  'Pets': '🐾',
+  'Services': '🛠️',
+  'Payment': '💸',
 };
 
+const CATEGORY_ALIAS: Record<string, string> = {
+  // Splitwise Entertainment subcategories → Entertainment
+  'Entertainment - Other': 'Entertainment',
+  'Games': 'Entertainment',
+  'Movies': 'Entertainment',
+  'Music': 'Entertainment',
+  // Splitwise Food subcategories
+  'Food and drink - Other': 'Dining out',
+  'Food & Drink': 'Dining out',
+  'Food and drink': 'Dining out',
+  'Liquor': 'Drinks',
+  // Splitwise Home subcategories → Household
+  'Home - Other': 'Household',
+  'Home': 'Household',
+  'Electronics': 'Shopping',
+  'Furniture': 'Household',
+  'Household supplies': 'Household',
+  'Maintenance': 'Household',
+  'Mortgage': 'Rent',
+  // Splitwise Life subcategories
+  'Life - Other': 'General',
+  'Life': 'General',
+  'Childcare': 'General',
+  'Clothing': 'Shopping',
+  'Medical expenses': 'Healthcare',
+  // Splitwise Transportation subcategories → Transport
+  'Transportation - Other': 'Transport',
+  'Transportation': 'Transport',
+  'Bicycle': 'Transport',
+  'Bus/train': 'Transport',
+  'Car': 'Transport',
+  'Gas/fuel': 'Transport',
+  'Hotel': 'Travel',
+  'Parking': 'Transport',
+  'Plane': 'Travel',
+  'Taxi': 'Transport',
+  // Splitwise Utilities subcategories → Utilities
+  'Utilities - Other': 'Utilities',
+  'Cleaning': 'Household',
+  'Electricity': 'Utilities',
+  'Heat/gas': 'Utilities',
+  'TV/Phone/Internet': 'Utilities',
+  'Trash': 'Utilities',
+  'Water': 'Utilities',
+  // Old app aliases
+  'Other': 'General',
+};
+
+export function normalizeCategory(category: string): string {
+  if (CATEGORY_EMOJI[category]) return category;
+  return CATEGORY_ALIAS[category] || 'General';
+}
+
 export function getCategoryEmoji(category: string): string {
-  return CATEGORY_EMOJI[category] || '📋';
+  const normalized = normalizeCategory(category);
+  return CATEGORY_EMOJI[normalized] || '📋';
 }

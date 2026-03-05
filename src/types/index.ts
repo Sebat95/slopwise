@@ -50,59 +50,33 @@ export interface GoogleTokenInfo {
 }
 
 export const CATEGORIES = [
-  // Uncategorized / General
   'General',
-  // Entertainment
-  'Entertainment - Other',
-  'Games',
-  'Movies',
-  'Music',
-  'Sports',
-  // Food and drink
-  'Food and drink - Other',
-  'Dining out',
   'Groceries',
-  'Liquor',
-  // Home
-  'Home - Other',
-  'Electronics',
-  'Furniture',
-  'Household supplies',
-  'Maintenance',
-  'Mortgage',
-  'Pets',
+  'Dining out',
+  'Drinks',
   'Rent',
-  'Services',
-  // Life
-  'Life - Other',
-  'Childcare',
-  'Clothing',
+  'Utilities',
+  'Household',
+  'Transport',
+  'Travel',
+  'Entertainment',
+  'Shopping',
+  'Healthcare',
   'Education',
   'Gifts',
   'Insurance',
-  'Medical expenses',
   'Taxes',
-  // Transportation
-  'Transportation - Other',
-  'Bicycle',
-  'Bus/train',
-  'Car',
-  'Gas/fuel',
-  'Hotel',
-  'Parking',
-  'Plane',
-  'Taxi',
-  // Utilities
-  'Utilities - Other',
-  'Cleaning',
-  'Electricity',
-  'Heat/gas',
-  'TV/Phone/Internet',
-  'Trash',
-  'Water',
-  // Special
-  'Payment'
+  'Sports',
+  'Pets',
+  'Services',
+  'Payment',
 ] as const;
+
+export interface MemberInfo {
+  name: string;
+  email: string;
+  photoUrl: string;
+}
 
 export const CURRENCIES = [
   'USD',

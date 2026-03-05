@@ -1,4 +1,5 @@
 import { getInitials, getAvatarColor } from '../utils/format';
+import { useApp } from '../contexts/AppContext';
 
 interface AvatarProps {
   name: string;
@@ -12,6 +13,21 @@ const SIZES = {
 };
 
 export default function Avatar({ name, size = 'md' }: AvatarProps) {
+  const { memberProfiles } = useApp();
+  const profile = memberProfiles[name];
+  const photoUrl = profile?.photoUrl;
+
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        referrerPolicy="no-referrer"
+        className={`${SIZES[size]} shrink-0 rounded-full object-cover`}
+      />
+    );
+  }
+
   const color = getAvatarColor(name);
   return (
     <div

@@ -5,14 +5,16 @@ import {
   useCallback,
   type ReactNode
 } from 'react';
-import type { Expense } from '../types';
+import type { Expense, MemberInfo } from '../types';
 import * as sheetsApi from '../services/sheets-api';
+import { fetchUserProfile } from '../services/google-auth';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AppState {
   spreadsheetId: string | null;
   spreadsheetName: string | null;
   members: string[];
+  memberProfiles: Record<string, MemberInfo>;
   expenses: Expense[];
   currency: string;
   isLoading: boolean;
@@ -47,6 +49,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     spreadsheetId: sessionStorage.getItem('splitsheet_spreadsheet_id'),
     spreadsheetName: sessionStorage.getItem('splitsheet_spreadsheet_name'),
     members: [],
+    memberProfiles: {},
     expenses: [],
     currency: 'EUR',
     isLoading: false,
@@ -73,10 +76,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
-      const data = await sheetsApi.readSheetData(ssId);
+      const [data, profiles] = await Promise.all([
+        sheetsApi.readSheetData(ssId),
+        sheetsApi.readMemberProfiles(ssId).catch(() => [] as MemberInfo[]),
+      ]);
+
+      const profileMap: Record<string, MemberInfo> = {};
+      for (const p of profiles) profileMap[p.name] = p;
+
+      // Save current Google user into _members
+      fetchUserProfile().then(async (user) => {
+        if (!user) return;
+        const matchingMember = data.members.find(
+          (m) => m === user.name || m.toLowerCase() === user.name.toLowerCase() ||
+                 m === user.email.split('@')[0]
+        );
+        if (matchingMember) {
+          const info: MemberInfo = { name: matchingMember, email: user.email, photoUrl: user.picture };
+          profileMap[matchingMember] = info;
+          setState((s) => ({ ...s, memberProfiles: { ...s.memberProfiles, [matchingMember]: info } }));
+          sheetsApi.saveMemberProfile(ssId, info).catch(() => {});
+        }
+      });
+
       setState((s) => ({
         ...s,
         members: data.members,
+        memberProfiles: profileMap,
         expenses: data.expenses,
         currency: data.currency,
         isLoading: false,
