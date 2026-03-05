@@ -33,6 +33,7 @@ interface AppContextValue extends AppState {
   ) => Promise<void>;
   deleteExpense: (expenseId: string) => Promise<void>;
   addMember: (name: string) => Promise<void>;
+  renameMember: (oldName: string, newName: string) => Promise<void>;
   settleUp: (from: string, to: string, amount: number) => Promise<void>;
   renameSheet: (newName: string) => Promise<void>;
   importExpenses: (
@@ -238,6 +239,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [state.members]
   );
 
+  const renameMember = useCallback(
+    async (oldName: string, newName: string) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId || !newName.trim() || oldName === newName.trim()) return;
+      const trimmed = newName.trim();
+      if (state.members.includes(trimmed)) return;
+
+      setState((s) => ({
+        ...s,
+        members: s.members.map((m) => (m === oldName ? trimmed : m)),
+        expenses: s.expenses.map((e) => {
+          const newSplits = { ...e.splits };
+          if (oldName in newSplits) {
+            newSplits[trimmed] = newSplits[oldName];
+            delete newSplits[oldName];
+          }
+          return {
+            ...e,
+            paidBy: e.paidBy === oldName ? trimmed : e.paidBy,
+            splits: newSplits
+          };
+        }),
+        memberProfiles: (() => {
+          const p = { ...s.memberProfiles };
+          if (p[oldName]) {
+            p[trimmed] = { ...p[oldName], name: trimmed };
+            delete p[oldName];
+          }
+          return p;
+        })(),
+        isSyncing: true
+      }));
+
+      try {
+        await sheetsApi.renameMemberColumn(ssId, state.members, oldName, trimmed);
+        const profile = state.memberProfiles[oldName];
+        if (profile) {
+          await sheetsApi.saveMemberProfile(ssId, { ...profile, name: trimmed }).catch(() => {});
+        }
+        setState((s) => ({ ...s, isSyncing: false }));
+      } catch (err) {
+        await loadData();
+        setState((s) => ({
+          ...s,
+          isSyncing: false,
+          error: err instanceof Error ? err.message : 'Failed to rename member'
+        }));
+      }
+    },
+    [state.members, state.memberProfiles, loadData]
+  );
+
   const settleUp = useCallback(
     async (from: string, to: string, amount: number) => {
       const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
@@ -365,6 +418,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateExpense,
         deleteExpense,
         addMember,
+        renameMember,
         settleUp,
         renameSheet,
         importExpenses,

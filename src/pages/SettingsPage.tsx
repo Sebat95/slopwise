@@ -15,7 +15,10 @@ import {
   ExternalLink,
   Users,
   RefreshCw,
-  Unplug
+  Unplug,
+  Pencil,
+  Check,
+  X
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -25,8 +28,10 @@ export default function SettingsPage() {
     spreadsheetId,
     spreadsheetName,
     members,
+    memberProfiles,
     expenses,
     addMember,
+    renameMember,
     importExpenses,
     loadData,
     disconnect,
@@ -37,6 +42,27 @@ export default function SettingsPage() {
   const [newMemberName, setNewMemberName] = useState('');
   const [adding, setAdding] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [editingMember, setEditingMember] = useState<string | null>(null);
+  const [memberDraft, setMemberDraft] = useState('');
+
+  const startEditMember = (name: string) => {
+    setEditingMember(name);
+    setMemberDraft(name);
+  };
+
+  const confirmRenameMember = async () => {
+    if (!editingMember) return;
+    const trimmed = memberDraft.trim();
+    if (trimmed && trimmed !== editingMember) {
+      await renameMember(editingMember, trimmed);
+    }
+    setEditingMember(null);
+  };
+
+  const cancelEditMember = () => {
+    setEditingMember(null);
+  };
 
   const handleAddMember = async () => {
     const name = newMemberName.trim();
@@ -81,7 +107,7 @@ export default function SettingsPage() {
       ) {
         await importExpenses(csvExpenses, csvMembers);
       }
-    } catch (err) {
+    } catch {
       alert('Failed to import CSV file');
     }
 
@@ -178,12 +204,61 @@ export default function SettingsPage() {
             </button>
           </div>
           <div className="bg-bg-card border-border/50 divide-border/30 divide-y rounded-xl border">
-            {members.map((m) => (
-              <div key={m} className="flex items-center gap-3 p-3">
-                <Avatar name={m} size="sm" />
-                <span className="text-text-primary text-sm">{m}</span>
-              </div>
-            ))}
+            {members.map((m) => {
+              const profile = memberProfiles[m];
+              const isEditing = editingMember === m;
+
+              return (
+                <div key={m} className="flex items-center gap-3 p-3">
+                  <Avatar name={m} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={memberDraft}
+                          onChange={(e) => setMemberDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') confirmRenameMember();
+                            if (e.key === 'Escape') cancelEditMember();
+                          }}
+                          autoFocus
+                          className="bg-bg-input border-border text-text-primary focus:border-primary min-w-0 flex-1 rounded-lg border px-2 py-1 text-sm focus:outline-none"
+                        />
+                        <button
+                          onClick={confirmRenameMember}
+                          className="text-positive hover:bg-positive/10 rounded-md p-1 transition-colors"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          onClick={cancelEditMember}
+                          className="text-text-muted hover:bg-bg-surface rounded-md p-1 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEditMember(m)}
+                        className="group flex items-center gap-1.5 text-left"
+                      >
+                        <span className="text-text-primary text-sm">{m}</span>
+                        <Pencil
+                          size={11}
+                          className="text-text-muted shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                        />
+                      </button>
+                    )}
+                    {profile?.email && !isEditing && (
+                      <p className="text-text-muted mt-0.5 text-[11px]">
+                        {profile.email}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
 

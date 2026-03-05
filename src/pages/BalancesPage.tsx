@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
-import Modal from '../components/Modal';
 import EmptyState from '../components/EmptyState';
 import SpendingChart from '../components/SpendingChart';
 import { calculateNetBalances, simplifyDebts } from '../utils/balance';
@@ -17,12 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function BalancesPage() {
-  const { members, expenses, currency, settleUp } = useApp();
-  const [showSettle, setShowSettle] = useState(false);
-  const [settleFrom, setSettleFrom] = useState('');
-  const [settleTo, setSettleTo] = useState('');
-  const [settleAmount, setSettleAmount] = useState('');
-  const [settling, setSettling] = useState(false);
+  const { members, expenses, currency } = useApp();
 
   const { minDate, maxDate } = useMemo(() => {
     if (expenses.length === 0) return { minDate: '', maxDate: '' };
@@ -80,27 +74,6 @@ export default function BalancesPage() {
   const netBalances = calculateNetBalances(filteredExpenses, members);
   const debts = simplifyDebts(filteredExpenses, members);
 
-  const openSettle = (from?: string, to?: string, amount?: number) => {
-    setSettleFrom(from || members[0] || '');
-    setSettleTo(to || members[1] || '');
-    setSettleAmount(amount ? amount.toFixed(2) : '');
-    setShowSettle(true);
-  };
-
-  const handleSettle = async () => {
-    const amt = parseFloat(settleAmount);
-    if (!settleFrom || !settleTo || settleFrom === settleTo || !amt || amt <= 0)
-      return;
-    setSettling(true);
-    try {
-      await settleUp(settleFrom, settleTo, amt);
-      setShowSettle(false);
-    } catch {
-    } finally {
-      setSettling(false);
-    }
-  };
-
   const sorted = [...members].sort(
     (a, b) => (netBalances[b] || 0) - (netBalances[a] || 0)
   );
@@ -110,14 +83,8 @@ export default function BalancesPage() {
   return (
     <Layout>
       <div className="mx-auto max-w-lg px-4 py-4">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <h1 className="text-text-primary text-xl font-bold">Stats</h1>
-          <button
-            onClick={() => openSettle()}
-            className="bg-primary hover:bg-primary-dark flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-colors"
-          >
-            <Handshake size={16} /> Settle Up
-          </button>
         </div>
 
         {/* Date Range + Total */}
@@ -252,10 +219,9 @@ export default function BalancesPage() {
                 </h2>
                 <div className="space-y-2">
                   {debts.map((d, i) => (
-                    <button
+                    <div
                       key={i}
-                      onClick={() => openSettle(d.from, d.to, d.amount)}
-                      className="bg-bg-card border-border/50 hover:border-primary/30 flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-colors"
+                      className="bg-bg-card border-border/50 flex items-center gap-3 rounded-xl border p-3.5"
                     >
                       <Avatar name={d.from} size="sm" />
                       <div className="min-w-0 flex-1">
@@ -268,14 +234,11 @@ export default function BalancesPage() {
                             {d.to}
                           </span>
                         </div>
-                        <p className="text-text-muted mt-0.5 text-xs">
-                          Tap to settle
-                        </p>
                       </div>
                       <span className="text-negative text-sm font-bold">
                         {formatCurrency(d.amount, currency)}
                       </span>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -319,83 +282,6 @@ export default function BalancesPage() {
         </div>
       )}
 
-      {/* Settle Up Modal */}
-      <Modal
-        open={showSettle}
-        onClose={() => setShowSettle(false)}
-        title="Settle Up"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
-              Who is paying?
-            </label>
-            <select
-              value={settleFrom}
-              onChange={(e) => setSettleFrom(e.target.value)}
-              className="bg-bg-input border-border text-text-primary focus:border-primary w-full appearance-none rounded-xl border px-4 py-3 text-sm focus:outline-none"
-            >
-              {members.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex justify-center">
-            <ArrowRight size={20} className="text-text-muted" />
-          </div>
-
-          <div>
-            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
-              Who is receiving?
-            </label>
-            <select
-              value={settleTo}
-              onChange={(e) => setSettleTo(e.target.value)}
-              className="bg-bg-input border-border text-text-primary focus:border-primary w-full appearance-none rounded-xl border px-4 py-3 text-sm focus:outline-none"
-            >
-              {members
-                .filter((m) => m !== settleFrom)
-                .map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
-              Amount
-            </label>
-            <input
-              type="number"
-              value={settleAmount}
-              onChange={(e) => setSettleAmount(e.target.value)}
-              placeholder="0.00"
-              step="0.01"
-              min="0"
-              className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
-            />
-          </div>
-
-          <button
-            onClick={handleSettle}
-            disabled={
-              settling ||
-              !settleFrom ||
-              !settleTo ||
-              settleFrom === settleTo ||
-              !parseFloat(settleAmount)
-            }
-            className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
-          >
-            {settling ? 'Recording...' : 'Record Payment'}
-          </button>
-        </div>
-      </Modal>
     </Layout>
   );
 }

@@ -266,6 +266,24 @@ export async function addMemberColumn(
   );
 }
 
+export async function renameMemberColumn(
+  spreadsheetId: string,
+  members: string[],
+  oldName: string,
+  newName: string
+): Promise<void> {
+  const colIndex = members.indexOf(oldName);
+  if (colIndex < 0) return;
+  const colLetter = String.fromCharCode(65 + 5 + colIndex);
+  await apiRequest(
+    `${SHEETS_API}/${spreadsheetId}/values/Expenses!${colLetter}1?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ values: [[newName]] })
+    }
+  );
+}
+
 export async function clearSheet(spreadsheetId: string): Promise<void> {
   await apiRequest(
     `${SHEETS_API}/${spreadsheetId}/values/Expenses!A2:ZZ10000:clear`,
