@@ -99,6 +99,25 @@ export async function createSpreadsheet(
   return data.spreadsheetId;
 }
 
+export async function renameSpreadsheet(
+  spreadsheetId: string,
+  newName: string
+): Promise<void> {
+  await apiRequest(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: [
+        {
+          updateSpreadsheetProperties: {
+            properties: { title: newName },
+            fields: 'title'
+          }
+        }
+      ]
+    })
+  });
+}
+
 export async function getSpreadsheetInfo(
   spreadsheetId: string
 ): Promise<{ title: string; sheets: string[] }> {

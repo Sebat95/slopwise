@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
 import EmptyState from '../components/EmptyState';
+import SpendingChart from '../components/SpendingChart';
 import { calculateNetBalances, simplifyDebts } from '../utils/balance';
 import { formatCurrency } from '../utils/format';
 import {
@@ -72,6 +73,17 @@ export default function BalancesPage() {
           />
         ) : (
           <>
+            {/* Spending Over Time Chart */}
+            {expenses.length >= 2 && (
+              <div className="mb-6">
+                <SpendingChart
+                  expenses={expenses}
+                  members={members}
+                  currency={currency}
+                />
+              </div>
+            )}
+
             {/* Net Balances */}
             <div className="mb-6">
               <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">

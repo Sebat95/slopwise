@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
@@ -9,7 +9,15 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import { calculateNetBalances, simplifyDebts } from '../utils/balance';
 import { formatCurrency } from '../utils/format';
-import { PlusCircle, ArrowRight, Receipt, RefreshCw } from 'lucide-react';
+import {
+  PlusCircle,
+  ArrowRight,
+  Receipt,
+  RefreshCw,
+  Pencil,
+  Check,
+  X
+} from 'lucide-react';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -20,8 +28,13 @@ export default function DashboardPage() {
     currency,
     isLoading,
     loadData,
-    deleteExpense
+    deleteExpense,
+    renameSheet
   } = useApp();
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (expenses.length === 0 && !isLoading) {
@@ -29,13 +42,27 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const startEditing = () => {
+    setDraft(spreadsheetName || '');
+    setEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const confirmRename = async () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== spreadsheetName) {
+      await renameSheet(trimmed);
+    }
+    setEditing(false);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+  };
+
   const netBalances = calculateNetBalances(expenses, members);
   const debts = simplifyDebts(expenses, members);
   const recentExpenses = [...expenses].reverse().slice(0, 5);
-
-  const totalExpenses = expenses
-    .filter((e) => e.category !== 'Payment')
-    .reduce((sum, e) => sum + e.cost, 0);
 
   const handleEdit = (id: string) => navigate(`/edit/${id}`);
   const handleDelete = (id: string) => {
@@ -53,12 +80,49 @@ export default function DashboardPage() {
   return (
     <Layout>
       <div className="mx-auto max-w-lg px-4 py-4">
-        {/* Header */}
+        {/* Header with editable name */}
         <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-text-primary text-xl font-bold">
-              {spreadsheetName || 'SplitSheet'}
-            </h1>
+          <div className="min-w-0 flex-1">
+            {editing ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') confirmRename();
+                    if (e.key === 'Escape') cancelEditing();
+                  }}
+                  className="bg-bg-input border-border text-text-primary focus:border-primary min-w-0 flex-1 rounded-lg border px-2.5 py-1 text-xl font-bold focus:outline-none"
+                />
+                <button
+                  onClick={confirmRename}
+                  className="text-positive hover:bg-positive/10 rounded-lg p-1.5 transition-colors"
+                >
+                  <Check size={18} />
+                </button>
+                <button
+                  onClick={cancelEditing}
+                  className="text-text-muted hover:bg-bg-surface rounded-lg p-1.5 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={startEditing}
+                className="group flex items-center gap-2 text-left"
+              >
+                <h1 className="text-text-primary truncate text-xl font-bold">
+                  {spreadsheetName || 'SplitSheet'}
+                </h1>
+                <Pencil
+                  size={14}
+                  className="text-text-muted shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                />
+              </button>
+            )}
             <div className="mt-0.5 flex items-center gap-2">
               <span className="text-text-muted text-xs">
                 {members.length} members
@@ -69,23 +133,15 @@ export default function DashboardPage() {
           <button
             onClick={() => loadData()}
             disabled={isLoading}
-            className="text-text-muted hover:text-primary hover:bg-bg-surface rounded-lg p-2 transition-colors"
+            className="text-text-muted hover:text-primary hover:bg-bg-surface shrink-0 rounded-lg p-2 transition-colors"
           >
             <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
           </button>
         </div>
 
-        {/* Summary Card */}
-        <div className="bg-bg-card border-border/50 mb-6 rounded-2xl border p-4">
-          <div className="text-text-muted mb-1 text-xs tracking-wide uppercase">
-            Total expenses
-          </div>
-          <div className="text-text-primary mb-3 text-2xl font-bold">
-            {formatCurrency(totalExpenses, currency)}
-          </div>
-
-          {/* Member Balances Row */}
-          {members.length > 0 && (
+        {/* Member Balances */}
+        {members.length > 0 && (
+          <div className="bg-bg-card border-border/50 mb-6 rounded-2xl border p-4">
             <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
               {members.map((m) => {
                 const bal = netBalances[m] || 0;
@@ -114,8 +170,8 @@ export default function DashboardPage() {
                 );
               })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Outstanding Debts */}
         {debts.length > 0 && (

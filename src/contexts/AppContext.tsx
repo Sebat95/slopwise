@@ -32,6 +32,7 @@ interface AppContextValue extends AppState {
   deleteExpense: (expenseId: string) => Promise<void>;
   addMember: (name: string) => Promise<void>;
   settleUp: (from: string, to: string, amount: number) => Promise<void>;
+  renameSheet: (newName: string) => Promise<void>;
   importExpenses: (
     newExpenses: Expense[],
     newMembers: string[]
@@ -255,6 +256,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [state.members, state.currency]
   );
 
+  const renameSheet = useCallback(
+    async (newName: string) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId || !newName.trim()) return;
+
+      const trimmed = newName.trim();
+      const oldName = state.spreadsheetName;
+
+      sessionStorage.setItem('splitsheet_spreadsheet_name', trimmed);
+      setState((s) => ({ ...s, spreadsheetName: trimmed, isSyncing: true }));
+
+      try {
+        await sheetsApi.renameSpreadsheet(ssId, trimmed);
+        setState((s) => ({ ...s, isSyncing: false }));
+      } catch (err) {
+        sessionStorage.setItem(
+          'splitsheet_spreadsheet_name',
+          oldName || ''
+        );
+        setState((s) => ({
+          ...s,
+          spreadsheetName: oldName,
+          isSyncing: false,
+          error:
+            err instanceof Error ? err.message : 'Failed to rename sheet'
+        }));
+      }
+    },
+    [state.spreadsheetName]
+  );
+
   const importExpenses = useCallback(
     async (newExpenses: Expense[], newMembers: string[]) => {
       const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
@@ -312,6 +344,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteExpense,
         addMember,
         settleUp,
+        renameSheet,
         importExpenses,
         disconnect
       }}
