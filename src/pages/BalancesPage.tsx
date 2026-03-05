@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
@@ -24,17 +24,36 @@ export default function BalancesPage() {
   const [settleAmount, setSettleAmount] = useState('');
   const [settling, setSettling] = useState(false);
 
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const { minDate, maxDate } = useMemo(() => {
+    if (expenses.length === 0) return { minDate: '', maxDate: '' };
+    const dates = expenses.map((e) => e.date).sort();
+    return { minDate: dates[0], maxDate: dates[dates.length - 1] };
+  }, [expenses]);
+
+  const [dateFrom, setDateFrom] = useState<string | null>(null);
+  const [dateTo, setDateTo] = useState<string | null>(null);
+
+  const effectiveFrom = dateFrom ?? minDate;
+  const effectiveTo = dateTo ?? maxDate;
+
+  const onChartRangeChange = useCallback((from: string, to: string) => {
+    setDateFrom(from);
+    setDateTo(to);
+  }, []);
+
+  const resetRange = useCallback(() => {
+    setDateFrom(null);
+    setDateTo(null);
+  }, []);
 
   const filteredExpenses = useMemo(() => {
-    if (!dateFrom && !dateTo) return expenses;
+    if (!effectiveFrom && !effectiveTo) return expenses;
     return expenses.filter((e) => {
-      if (dateFrom && e.date < dateFrom) return false;
-      if (dateTo && e.date > dateTo) return false;
+      if (effectiveFrom && e.date < effectiveFrom) return false;
+      if (effectiveTo && e.date > effectiveTo) return false;
       return true;
     });
-  }, [expenses, dateFrom, dateTo]);
+  }, [expenses, effectiveFrom, effectiveTo]);
 
   const totalExpenses = useMemo(
     () =>
@@ -52,8 +71,7 @@ export default function BalancesPage() {
       for (const m of members) {
         const net = exp.splits[m] ?? 0;
         const paid = m === exp.paidBy ? exp.cost : 0;
-        const share = paid - net;
-        totals[m] += share;
+        totals[m] += paid - net;
       }
     }
     return totals;
@@ -73,7 +91,6 @@ export default function BalancesPage() {
     const amt = parseFloat(settleAmount);
     if (!settleFrom || !settleTo || settleFrom === settleTo || !amt || amt <= 0)
       return;
-
     setSettling(true);
     try {
       await settleUp(settleFrom, settleTo, amt);
@@ -88,7 +105,7 @@ export default function BalancesPage() {
     (a, b) => (netBalances[b] || 0) - (netBalances[a] || 0)
   );
 
-  const hasDateFilter = !!dateFrom || !!dateTo;
+  const isRangeModified = dateFrom !== null || dateTo !== null;
 
   return (
     <Layout>
@@ -103,47 +120,41 @@ export default function BalancesPage() {
           </button>
         </div>
 
-        {/* Date Range Filter */}
+        {/* Date Range + Total */}
         <div className="bg-bg-card border-border/50 mb-6 rounded-2xl border p-4">
           <div className="mb-3 flex items-center gap-2">
             <CalendarRange size={14} className="text-text-muted" />
             <span className="text-text-muted text-xs font-semibold tracking-wide uppercase">
               Date Range
             </span>
-            {hasDateFilter && (
+            {isRangeModified && (
               <button
-                onClick={() => {
-                  setDateFrom('');
-                  setDateTo('');
-                }}
+                onClick={resetRange}
                 className="text-primary ml-auto text-xs hover:underline"
               >
-                Clear
+                Reset
               </button>
             )}
           </div>
           <div className="flex items-center gap-2">
             <input
               type="date"
-              value={dateFrom}
+              value={effectiveFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               className="bg-bg-input border-border text-text-primary focus:border-primary flex-1 rounded-lg border px-3 py-2 text-xs focus:outline-none"
-              placeholder="From"
             />
             <span className="text-text-muted text-xs">to</span>
             <input
               type="date"
-              value={dateTo}
+              value={effectiveTo}
               onChange={(e) => setDateTo(e.target.value)}
               className="bg-bg-input border-border text-text-primary focus:border-primary flex-1 rounded-lg border px-3 py-2 text-xs focus:outline-none"
-              placeholder="To"
             />
           </div>
 
-          {/* Total */}
           <div className="border-border/30 mt-4 border-t pt-3">
             <div className="text-text-muted text-[10px] tracking-wide uppercase">
-              Total Expenses{hasDateFilter ? ' (filtered)' : ''}
+              Total Expenses
             </div>
             <div className="text-text-primary text-2xl font-bold">
               {formatCurrency(totalExpenses, currency)}
@@ -169,13 +180,15 @@ export default function BalancesPage() {
           />
         ) : (
           <>
-            {/* Spending Over Time Chart */}
-            {filteredExpenses.length >= 2 && (
+            {/* Spending Chart with interactive brush */}
+            {expenses.length >= 2 && (
               <div className="mb-6">
                 <SpendingChart
-                  expenses={filteredExpenses}
+                  expenses={expenses}
                   members={members}
-                  currency={currency}
+                  dateFrom={effectiveFrom}
+                  dateTo={effectiveTo}
+                  onRangeChange={onChartRangeChange}
                 />
               </div>
             )}

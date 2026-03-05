@@ -1,31 +1,34 @@
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo, useRef, useCallback } from 'react';
 import type { Expense } from '../types';
 import { getAvatarColor } from '../utils/format';
 import { format, parseISO } from 'date-fns';
-import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 interface Props {
   expenses: Expense[];
   members: string[];
-  currency: string;
+  dateFrom: string;
+  dateTo: string;
+  onRangeChange: (from: string, to: string) => void;
 }
 
-interface ViewBox {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-const FULL_W = 600;
-const FULL_H = 280;
+const W = 600;
+const H = 220;
+const BRUSH_H = 40;
 const PAD_L = 48;
 const PAD_R = 16;
-const PAD_T = 16;
-const PAD_B = 40;
+const PAD_T = 12;
+const PAD_B = 28;
+const CHART_W = W - PAD_L - PAD_R;
+const CHART_H = H - PAD_T - PAD_B;
 
-export default function SpendingChart({ expenses, members }: Props) {
-  const cumulativeData = useMemo(() => {
+export default function SpendingChart({
+  expenses,
+  members,
+  dateFrom,
+  dateTo,
+  onRangeChange,
+}: Props) {
+  const allData = useMemo(() => {
     const nonPayments = expenses
       .filter((e) => e.category !== 'Payment')
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -36,182 +39,107 @@ export default function SpendingChart({ expenses, members }: Props) {
     for (const m of members) running[m] = 0;
 
     const points: { date: string; totals: Record<string, number> }[] = [];
-
     for (const exp of nonPayments) {
       for (const m of members) {
         const net = exp.splits[m] ?? 0;
         const paid = m === exp.paidBy ? exp.cost : 0;
-        const share = paid - net;
-        running[m] += share;
+        running[m] += paid - net;
       }
       points.push({ date: exp.date, totals: { ...running } });
     }
-
     return points;
   }, [expenses, members]);
 
-  const defaultVB: ViewBox = { x: 0, y: 0, w: FULL_W, h: FULL_H };
-  const [viewBox, setViewBox] = useState<ViewBox>(defaultVB);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const dragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0, vbx: 0, vby: 0 });
-  const lastTouchDist = useRef<number | null>(null);
-  const lastTouchCenter = useRef<{ x: number; y: number } | null>(null);
+  // Range indices derived from dateFrom/dateTo
+  const [rangeStart, rangeEnd] = useMemo(() => {
+    if (!allData) return [0, 0];
+    let s = 0;
+    let e = allData.length - 1;
+    if (dateFrom) {
+      const idx = allData.findIndex((p) => p.date >= dateFrom);
+      if (idx >= 0) s = idx;
+    }
+    if (dateTo) {
+      for (let i = allData.length - 1; i >= 0; i--) {
+        if (allData[i].date <= dateTo) { e = i; break; }
+      }
+    }
+    if (s > e) s = e;
+    return [s, e];
+  }, [allData, dateFrom, dateTo]);
 
-  const clampVB = useCallback((vb: ViewBox): ViewBox => {
-    const w = Math.max(100, Math.min(FULL_W, vb.w));
-    const h = Math.max(60, Math.min(FULL_H, vb.h));
-    const x = Math.max(0, Math.min(FULL_W - w, vb.x));
-    const y = Math.max(0, Math.min(FULL_H - h, vb.y));
-    return { x, y, w, h };
+  // Brush drag state
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragMode = useRef<'left' | 'right' | 'middle' | null>(null);
+  const dragOrigin = useRef({ x: 0, startIdx: 0, endIdx: 0 });
+
+  const idxFromClientX = useCallback(
+    (clientX: number): number => {
+      if (!allData || !containerRef.current) return 0;
+      const rect = containerRef.current.getBoundingClientRect();
+      const relX = clientX - rect.left;
+      const pct = (relX - PAD_L) / CHART_W;
+      return Math.round(Math.max(0, Math.min(allData.length - 1, pct * (allData.length - 1))));
+    },
+    [allData]
+  );
+
+  const commitRange = useCallback(
+    (s: number, e: number) => {
+      if (!allData) return;
+      const from = allData[Math.max(0, Math.min(s, allData.length - 1))].date;
+      const to = allData[Math.max(0, Math.min(e, allData.length - 1))].date;
+      onRangeChange(from, to);
+    },
+    [allData, onRangeChange]
+  );
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent, mode: 'left' | 'right' | 'middle') => {
+      e.preventDefault();
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      dragMode.current = mode;
+      dragOrigin.current = { x: e.clientX, startIdx: rangeStart, endIdx: rangeEnd };
+    },
+    [rangeStart, rangeEnd]
+  );
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragMode.current || !allData) return;
+      const idx = idxFromClientX(e.clientX);
+      const origin = dragOrigin.current;
+
+      if (dragMode.current === 'left') {
+        const s = Math.min(idx, rangeEnd);
+        commitRange(s, rangeEnd);
+      } else if (dragMode.current === 'right') {
+        const end = Math.max(idx, rangeStart);
+        commitRange(rangeStart, end);
+      } else {
+        const delta = idx - idxFromClientX(origin.x);
+        let s = origin.startIdx + delta;
+        let end = origin.endIdx + delta;
+        const span = end - s;
+        if (s < 0) { s = 0; end = span; }
+        if (end > allData.length - 1) { end = allData.length - 1; s = end - span; }
+        commitRange(Math.max(0, s), Math.min(allData.length - 1, end));
+      }
+    },
+    [allData, rangeStart, rangeEnd, idxFromClientX, commitRange]
+  );
+
+  const onPointerUp = useCallback(() => {
+    dragMode.current = null;
   }, []);
 
-  const svgPoint = useCallback(
-    (clientX: number, clientY: number) => {
-      const svg = svgRef.current;
-      if (!svg) return { x: 0, y: 0 };
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: ((clientX - rect.left) / rect.width) * viewBox.w + viewBox.x,
-        y: ((clientY - rect.top) / rect.height) * viewBox.h + viewBox.y
-      };
-    },
-    [viewBox]
-  );
+  if (!allData || allData.length < 2 || members.length === 0) return null;
 
-  const zoom = useCallback(
-    (factor: number, cx?: number, cy?: number) => {
-      setViewBox((prev) => {
-        const pivotX = cx ?? prev.x + prev.w / 2;
-        const pivotY = cy ?? prev.y + prev.h / 2;
-        const nw = prev.w * factor;
-        const nh = prev.h * factor;
-        return clampVB({
-          x: pivotX - (pivotX - prev.x) * factor,
-          y: pivotY - (pivotY - prev.y) * factor,
-          w: nw,
-          h: nh
-        });
-      });
-    },
-    [clampVB]
-  );
-
-  const resetView = useCallback(() => setViewBox(defaultVB), []);
-
-  // Mouse wheel zoom
-  const onWheel = useCallback(
-    (e: React.WheelEvent) => {
-      e.preventDefault();
-      const pt = svgPoint(e.clientX, e.clientY);
-      const factor = e.deltaY > 0 ? 1.15 : 0.87;
-      zoom(factor, pt.x, pt.y);
-    },
-    [svgPoint, zoom]
-  );
-
-  // Mouse drag
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.button !== 0) return;
-      dragging.current = true;
-      const pt = svgPoint(e.clientX, e.clientY);
-      dragStart.current = { x: pt.x, y: pt.y, vbx: viewBox.x, vby: viewBox.y };
-      e.preventDefault();
-    },
-    [svgPoint, viewBox]
-  );
-
-  const onMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!dragging.current) return;
-      const svg = svgRef.current;
-      if (!svg) return;
-      const rect = svg.getBoundingClientRect();
-      const dx = (e.movementX / rect.width) * viewBox.w;
-      const dy = (e.movementY / rect.height) * viewBox.h;
-      setViewBox((prev) =>
-        clampVB({ ...prev, x: prev.x - dx, y: prev.y - dy })
-      );
-    },
-    [viewBox, clampVB]
-  );
-
-  const onMouseUp = useCallback(() => {
-    dragging.current = false;
-  }, []);
-
-  // Touch pan & pinch-zoom
-  const onTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      if (e.touches.length === 1) {
-        dragging.current = true;
-        const pt = svgPoint(e.touches[0].clientX, e.touches[0].clientY);
-        dragStart.current = {
-          x: pt.x,
-          y: pt.y,
-          vbx: viewBox.x,
-          vby: viewBox.y
-        };
-      }
-      if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        lastTouchDist.current = Math.sqrt(dx * dx + dy * dy);
-        lastTouchCenter.current = {
-          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-          y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-        };
-      }
-    },
-    [svgPoint, viewBox]
-  );
-
-  const onTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      e.preventDefault();
-      if (e.touches.length === 1 && dragging.current) {
-        if (!svgRef.current) return;
-        const pt = svgPoint(e.touches[0].clientX, e.touches[0].clientY);
-        const startPt = dragStart.current;
-        setViewBox((prev) =>
-          clampVB({
-            ...prev,
-            x: startPt.vbx + (startPt.x - pt.x),
-            y: startPt.vby + (startPt.y - pt.y)
-          })
-        );
-      }
-      if (e.touches.length === 2 && lastTouchDist.current !== null) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const factor = lastTouchDist.current / dist;
-        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        const pt = svgPoint(cx, cy);
-        zoom(factor, pt.x, pt.y);
-        lastTouchDist.current = dist;
-      }
-    },
-    [svgPoint, clampVB, zoom]
-  );
-
-  const onTouchEnd = useCallback(() => {
-    dragging.current = false;
-    lastTouchDist.current = null;
-    lastTouchCenter.current = null;
-  }, []);
-
-  if (!cumulativeData || cumulativeData.length < 2 || members.length === 0) {
-    return null;
-  }
-
-  const chartW = FULL_W - PAD_L - PAD_R;
-  const chartH = FULL_H - PAD_T - PAD_B;
+  // Visible slice for the main chart
+  const visible = allData.slice(rangeStart, rangeEnd + 1);
 
   let maxVal = 0;
-  for (const pt of cumulativeData) {
+  for (const pt of visible) {
     for (const m of members) {
       if (pt.totals[m] > maxVal) maxVal = pt.totals[m];
     }
@@ -219,161 +147,144 @@ export default function SpendingChart({ expenses, members }: Props) {
   maxVal = Math.ceil(maxVal * 1.1) || 1;
 
   const xScale = (i: number) =>
-    PAD_L + (i / (cumulativeData.length - 1)) * chartW;
-  const yScale = (v: number) => PAD_T + chartH - (v / maxVal) * chartH;
+    PAD_L + (visible.length > 1 ? (i / (visible.length - 1)) * CHART_W : CHART_W / 2);
+  const yScale = (v: number) =>
+    PAD_T + CHART_H - (v / maxVal) * CHART_H;
+
+  // Brush positions (full data range)
+  const brushX = (i: number) =>
+    PAD_L + (i / (allData.length - 1)) * CHART_W;
+  const leftX = brushX(rangeStart);
+  const rightX = brushX(rangeEnd);
+
+  // Mini chart for brush
+  let brushMax = 0;
+  for (const pt of allData) {
+    for (const m of members) {
+      if (pt.totals[m] > brushMax) brushMax = pt.totals[m];
+    }
+  }
+  brushMax = brushMax || 1;
+  const brushYScale = (v: number) => BRUSH_H - 4 - ((v / brushMax) * (BRUSH_H - 8));
 
   const gridLines = 4;
   const yTicks = Array.from({ length: gridLines + 1 }, (_, i) =>
     Math.round((maxVal / gridLines) * i)
   );
 
-  const labelCount = Math.min(5, cumulativeData.length);
+  const labelCount = Math.min(5, visible.length);
   const labelIndices = Array.from({ length: labelCount }, (_, i) =>
-    Math.round((i * (cumulativeData.length - 1)) / (labelCount - 1))
+    Math.round((i * (visible.length - 1)) / Math.max(labelCount - 1, 1))
   );
-
-  const isZoomed = viewBox.w < FULL_W - 1 || viewBox.h < FULL_H - 1;
 
   return (
     <div className="bg-bg-card border-border/50 rounded-2xl border p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-text-muted text-xs font-semibold tracking-wide uppercase">
-          Spending Over Time
-        </h2>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => zoom(0.75)}
-            className="text-text-muted hover:text-text-primary hover:bg-bg-surface rounded-md p-1 transition-colors"
-            title="Zoom in"
-          >
-            <ZoomIn size={14} />
-          </button>
-          <button
-            onClick={() => zoom(1.33)}
-            className="text-text-muted hover:text-text-primary hover:bg-bg-surface rounded-md p-1 transition-colors"
-            title="Zoom out"
-          >
-            <ZoomOut size={14} />
-          </button>
-          {isZoomed && (
-            <button
-              onClick={resetView}
-              className="text-text-muted hover:text-text-primary hover:bg-bg-surface rounded-md p-1 transition-colors"
-              title="Reset view"
+      <h2 className="text-text-muted mb-2 text-xs font-semibold tracking-wide uppercase">
+        Spending Over Time
+      </h2>
+
+      {/* Main chart — shows selected range */}
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+        {yTicks.map((tick) => (
+          <g key={tick}>
+            <line
+              x1={PAD_L} x2={W - PAD_R}
+              y1={yScale(tick)} y2={yScale(tick)}
+              stroke="var(--color-border)" strokeWidth={0.5}
+            />
+            <text
+              x={PAD_L - 6} y={yScale(tick) + 4}
+              textAnchor="end" className="fill-text-muted" fontSize={10}
             >
-              <Maximize2 size={14} />
-            </button>
-          )}
+              {tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick}
+            </text>
+          </g>
+        ))}
+
+        {labelIndices.map((idx) => {
+          const pt = visible[idx];
+          if (!pt) return null;
+          let label: string;
+          try { label = format(parseISO(pt.date), 'MMM d'); } catch { label = pt.date; }
+          return (
+            <text key={idx} x={xScale(idx)} y={H - 4} textAnchor="middle" className="fill-text-muted" fontSize={10}>
+              {label}
+            </text>
+          );
+        })}
+
+        {members.map((m) => {
+          const color = getAvatarColor(m);
+          const pathD = visible
+            .map((pt, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(pt.totals[m] || 0).toFixed(1)}`)
+            .join(' ');
+          return (
+            <g key={m}>
+              <path d={pathD} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx={xScale(visible.length - 1)} cy={yScale(visible[visible.length - 1].totals[m] || 0)} r={3.5} fill={color} />
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Brush range selector */}
+      <div
+        ref={containerRef}
+        className="relative select-none touch-none"
+        style={{ height: BRUSH_H }}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+      >
+        {/* Mini overview chart */}
+        <svg viewBox={`0 0 ${W} ${BRUSH_H}`} className="absolute inset-0 w-full h-full">
+          <rect x={PAD_L} y={0} width={CHART_W} height={BRUSH_H} fill="var(--color-bg-surface)" rx={4} />
+          {members.map((m) => {
+            const color = getAvatarColor(m);
+            const d = allData
+              .map((pt, i) => `${i === 0 ? 'M' : 'L'}${brushX(i).toFixed(1)},${brushYScale(pt.totals[m] || 0).toFixed(1)}`)
+              .join(' ');
+            return <path key={m} d={d} fill="none" stroke={color} strokeWidth={1} opacity={0.5} />;
+          })}
+
+          {/* Dimmed regions outside selection */}
+          <rect x={PAD_L} y={0} width={Math.max(0, leftX - PAD_L)} height={BRUSH_H} fill="var(--color-bg-dark)" opacity={0.5} rx={4} />
+          <rect x={rightX} y={0} width={Math.max(0, PAD_L + CHART_W - rightX)} height={BRUSH_H} fill="var(--color-bg-dark)" opacity={0.5} rx={4} />
+        </svg>
+
+        {/* Draggable selection window */}
+        <div
+          className="absolute top-0 cursor-grab active:cursor-grabbing"
+          style={{ left: `${(leftX / W) * 100}%`, width: `${((rightX - leftX) / W) * 100}%`, height: BRUSH_H }}
+          onPointerDown={(e) => onPointerDown(e, 'middle')}
+        >
+          <div className="border-primary/60 h-full border-t-2 border-b-2" />
+        </div>
+
+        {/* Left handle */}
+        <div
+          className="absolute top-0 cursor-col-resize"
+          style={{ left: `${(leftX / W) * 100}%`, width: 16, height: BRUSH_H, transform: 'translateX(-8px)' }}
+          onPointerDown={(e) => onPointerDown(e, 'left')}
+        >
+          <div className="bg-primary mx-auto mt-1.5 h-[calc(100%-12px)] w-1 rounded-full" />
+        </div>
+
+        {/* Right handle */}
+        <div
+          className="absolute top-0 cursor-col-resize"
+          style={{ left: `${(rightX / W) * 100}%`, width: 16, height: BRUSH_H, transform: 'translateX(-8px)' }}
+          onPointerDown={(e) => onPointerDown(e, 'right')}
+        >
+          <div className="bg-primary mx-auto mt-1.5 h-[calc(100%-12px)] w-1 rounded-full" />
         </div>
       </div>
 
-      <div className="touch-none overflow-hidden rounded-lg select-none">
-        <svg
-          ref={svgRef}
-          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-          className="w-full cursor-grab active:cursor-grabbing"
-          style={{ minHeight: 200 }}
-          onWheel={onWheel}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseUp}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-        >
-          {/* Grid lines */}
-          {yTicks.map((tick) => (
-            <g key={tick}>
-              <line
-                x1={PAD_L}
-                x2={FULL_W - PAD_R}
-                y1={yScale(tick)}
-                y2={yScale(tick)}
-                stroke="var(--color-border)"
-                strokeWidth={0.5}
-              />
-              <text
-                x={PAD_L - 6}
-                y={yScale(tick) + 4}
-                textAnchor="end"
-                className="fill-text-muted"
-                fontSize={10}
-              >
-                {tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick}
-              </text>
-            </g>
-          ))}
-
-          {/* X-axis date labels */}
-          {labelIndices.map((idx) => {
-            const pt = cumulativeData[idx];
-            let label: string;
-            try {
-              label = format(parseISO(pt.date), 'MMM d');
-            } catch {
-              label = pt.date;
-            }
-            return (
-              <text
-                key={idx}
-                x={xScale(idx)}
-                y={FULL_H - 8}
-                textAnchor="middle"
-                className="fill-text-muted"
-                fontSize={10}
-              >
-                {label}
-              </text>
-            );
-          })}
-
-          {/* Lines for each member */}
-          {members.map((m) => {
-            const color = getAvatarColor(m);
-            const pathD = cumulativeData
-              .map(
-                (pt, i) =>
-                  `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(pt.totals[m] || 0).toFixed(1)}`
-              )
-              .join(' ');
-
-            return (
-              <g key={m}>
-                <path
-                  d={pathD}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle
-                  cx={xScale(cumulativeData.length - 1)}
-                  cy={yScale(
-                    cumulativeData[cumulativeData.length - 1].totals[m] || 0
-                  )}
-                  r={4}
-                  fill={color}
-                />
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-
-      <p className="text-text-muted mt-1.5 text-[10px]">
-        Scroll to zoom · Drag to pan
-      </p>
-
       {/* Legend */}
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
         {members.map((m) => (
           <div key={m} className="flex items-center gap-1.5">
-            <div
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: getAvatarColor(m) }}
-            />
+            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getAvatarColor(m) }} />
             <span className="text-text-secondary text-xs">{m}</span>
           </div>
         ))}
