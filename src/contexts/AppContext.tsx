@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  type ReactNode
+} from 'react';
 import type { Expense } from '../types';
 import * as sheetsApi from '../services/sheets-api';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,7 +28,10 @@ interface AppContextValue extends AppState {
   deleteExpense: (expenseId: string) => Promise<void>;
   addMember: (name: string) => Promise<void>;
   settleUp: (from: string, to: string, amount: number) => Promise<void>;
-  importExpenses: (newExpenses: Expense[], newMembers: string[]) => Promise<void>;
+  importExpenses: (
+    newExpenses: Expense[],
+    newMembers: string[]
+  ) => Promise<void>;
   disconnect: () => void;
 }
 
@@ -38,13 +47,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isLoading: false,
     isSyncing: false,
     error: null,
-    lastSync: null,
+    lastSync: null
   });
 
   const selectSpreadsheet = useCallback((id: string, name: string) => {
     sessionStorage.setItem('splitsheet_spreadsheet_id', id);
     sessionStorage.setItem('splitsheet_spreadsheet_name', name);
-    setState((s) => ({ ...s, spreadsheetId: id, spreadsheetName: name, members: [], expenses: [] }));
+    setState((s) => ({
+      ...s,
+      spreadsheetId: id,
+      spreadsheetName: name,
+      members: [],
+      expenses: []
+    }));
   }, []);
 
   const loadData = useCallback(async () => {
@@ -60,151 +75,176 @@ export function AppProvider({ children }: { children: ReactNode }) {
         expenses: data.expenses,
         currency: data.currency,
         isLoading: false,
-        lastSync: new Date(),
+        lastSync: new Date()
       }));
     } catch (err) {
       setState((s) => ({
         ...s,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Failed to load data',
+        error: err instanceof Error ? err.message : 'Failed to load data'
       }));
     }
   }, []);
 
-  const addExpense = useCallback(async (expense: Omit<Expense, 'id'>) => {
-    const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
-    if (!ssId) return;
+  const addExpense = useCallback(
+    async (expense: Omit<Expense, 'id'>) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId) return;
 
-    const newExpense: Expense = { ...expense, id: uuidv4() };
-    setState((s) => ({
-      ...s,
-      expenses: [...s.expenses, newExpense],
-      isSyncing: true,
-    }));
-
-    try {
-      await sheetsApi.appendExpense(ssId, newExpense, state.members);
-      setState((s) => ({ ...s, isSyncing: false }));
-    } catch (err) {
+      const newExpense: Expense = { ...expense, id: uuidv4() };
       setState((s) => ({
         ...s,
-        isSyncing: false,
-        error: err instanceof Error ? err.message : 'Failed to save expense',
-        expenses: s.expenses.filter((e) => e.id !== newExpense.id),
+        expenses: [...s.expenses, newExpense],
+        isSyncing: true
       }));
-    }
-  }, [state.members]);
 
-  const deleteExpense = useCallback(async (expenseId: string) => {
-    const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
-    if (!ssId) return;
+      try {
+        await sheetsApi.appendExpense(ssId, newExpense, state.members);
+        setState((s) => ({ ...s, isSyncing: false }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          isSyncing: false,
+          error: err instanceof Error ? err.message : 'Failed to save expense',
+          expenses: s.expenses.filter((e) => e.id !== newExpense.id)
+        }));
+      }
+    },
+    [state.members]
+  );
 
-    const idx = state.expenses.findIndex((e) => e.id === expenseId);
-    if (idx < 0) return;
+  const deleteExpense = useCallback(
+    async (expenseId: string) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId) return;
 
-    const backup = [...state.expenses];
-    setState((s) => ({
-      ...s,
-      expenses: s.expenses.filter((e) => e.id !== expenseId),
-      isSyncing: true,
-    }));
+      const idx = state.expenses.findIndex((e) => e.id === expenseId);
+      if (idx < 0) return;
 
-    try {
-      await sheetsApi.deleteExpenseRow(ssId, idx);
-      setState((s) => ({ ...s, isSyncing: false }));
-    } catch (err) {
+      const backup = [...state.expenses];
       setState((s) => ({
         ...s,
-        expenses: backup,
-        isSyncing: false,
-        error: err instanceof Error ? err.message : 'Failed to delete expense',
+        expenses: s.expenses.filter((e) => e.id !== expenseId),
+        isSyncing: true
       }));
-    }
-  }, [state.expenses]);
 
-  const addMember = useCallback(async (name: string) => {
-    const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
-    if (!ssId) return;
-    if (state.members.includes(name)) return;
+      try {
+        await sheetsApi.deleteExpenseRow(ssId, idx);
+        setState((s) => ({ ...s, isSyncing: false }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          expenses: backup,
+          isSyncing: false,
+          error: err instanceof Error ? err.message : 'Failed to delete expense'
+        }));
+      }
+    },
+    [state.expenses]
+  );
 
-    setState((s) => ({ ...s, isSyncing: true }));
-    try {
-      await sheetsApi.addMemberColumn(ssId, state.members, name);
-      setState((s) => ({ ...s, members: [...s.members, name], isSyncing: false }));
-    } catch (err) {
+  const addMember = useCallback(
+    async (name: string) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId) return;
+      if (state.members.includes(name)) return;
+
+      setState((s) => ({ ...s, isSyncing: true }));
+      try {
+        await sheetsApi.addMemberColumn(ssId, state.members, name);
+        setState((s) => ({
+          ...s,
+          members: [...s.members, name],
+          isSyncing: false
+        }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          isSyncing: false,
+          error: err instanceof Error ? err.message : 'Failed to add member'
+        }));
+      }
+    },
+    [state.members]
+  );
+
+  const settleUp = useCallback(
+    async (from: string, to: string, amount: number) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId) return;
+
+      const splits: Record<string, number> = {};
+      for (const m of state.members) splits[m] = 0;
+      splits[from] = amount;
+      splits[to] = -amount;
+
+      const settlement: Expense = {
+        id: uuidv4(),
+        date: new Date().toISOString().split('T')[0],
+        description: `${from} paid ${to}`,
+        category: 'Payment',
+        cost: amount,
+        currency: state.currency,
+        paidBy: from,
+        splitType: 'exact',
+        splits
+      };
+
       setState((s) => ({
         ...s,
-        isSyncing: false,
-        error: err instanceof Error ? err.message : 'Failed to add member',
+        expenses: [...s.expenses, settlement],
+        isSyncing: true
       }));
-    }
-  }, [state.members]);
 
-  const settleUp = useCallback(async (from: string, to: string, amount: number) => {
-    const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
-    if (!ssId) return;
+      try {
+        await sheetsApi.appendExpense(ssId, settlement, state.members);
+        setState((s) => ({ ...s, isSyncing: false }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          isSyncing: false,
+          error:
+            err instanceof Error ? err.message : 'Failed to save settlement',
+          expenses: s.expenses.filter((e) => e.id !== settlement.id)
+        }));
+      }
+    },
+    [state.members, state.currency]
+  );
 
-    const splits: Record<string, number> = {};
-    for (const m of state.members) splits[m] = 0;
-    splits[from] = amount;
-    splits[to] = -amount;
+  const importExpenses = useCallback(
+    async (newExpenses: Expense[], newMembers: string[]) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId) return;
 
-    const settlement: Expense = {
-      id: uuidv4(),
-      date: new Date().toISOString().split('T')[0],
-      description: `${from} paid ${to}`,
-      category: 'Payment',
-      cost: amount,
-      currency: state.currency,
-      paidBy: from,
-      splitType: 'exact',
-      splits,
-    };
+      setState((s) => ({ ...s, isSyncing: true }));
+      try {
+        const allMembers = [...new Set([...state.members, ...newMembers])];
+        const allExpenses = [...state.expenses, ...newExpenses];
 
-    setState((s) => ({
-      ...s,
-      expenses: [...s.expenses, settlement],
-      isSyncing: true,
-    }));
-
-    try {
-      await sheetsApi.appendExpense(ssId, settlement, state.members);
-      setState((s) => ({ ...s, isSyncing: false }));
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        isSyncing: false,
-        error: err instanceof Error ? err.message : 'Failed to save settlement',
-        expenses: s.expenses.filter((e) => e.id !== settlement.id),
-      }));
-    }
-  }, [state.members, state.currency]);
-
-  const importExpenses = useCallback(async (newExpenses: Expense[], newMembers: string[]) => {
-    const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
-    if (!ssId) return;
-
-    setState((s) => ({ ...s, isSyncing: true }));
-    try {
-      const allMembers = [...new Set([...state.members, ...newMembers])];
-      const allExpenses = [...state.expenses, ...newExpenses];
-
-      await sheetsApi.writeAllExpenses(ssId, allExpenses, allMembers, state.currency);
-      setState((s) => ({
-        ...s,
-        members: allMembers,
-        expenses: allExpenses,
-        isSyncing: false,
-        lastSync: new Date(),
-      }));
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        isSyncing: false,
-        error: err instanceof Error ? err.message : 'Failed to import',
-      }));
-    }
-  }, [state.members, state.expenses, state.currency]);
+        await sheetsApi.writeAllExpenses(
+          ssId,
+          allExpenses,
+          allMembers,
+          state.currency
+        );
+        setState((s) => ({
+          ...s,
+          members: allMembers,
+          expenses: allExpenses,
+          isSyncing: false,
+          lastSync: new Date()
+        }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          isSyncing: false,
+          error: err instanceof Error ? err.message : 'Failed to import'
+        }));
+      }
+    },
+    [state.members, state.expenses, state.currency]
+  );
 
   const disconnect = useCallback(() => {
     sessionStorage.removeItem('splitsheet_spreadsheet_id');
@@ -214,7 +254,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       spreadsheetId: null,
       spreadsheetName: null,
       members: [],
-      expenses: [],
+      expenses: []
     }));
   }, []);
 
@@ -229,7 +269,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addMember,
         settleUp,
         importExpenses,
-        disconnect,
+        disconnect
       }}
     >
       {children}

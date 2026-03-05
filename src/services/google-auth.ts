@@ -2,7 +2,7 @@ import type { GoogleTokenInfo } from '../types';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
-  'https://www.googleapis.com/auth/drive.metadata.readonly',
+  'https://www.googleapis.com/auth/drive.metadata.readonly'
 ].join(' ');
 
 const SESSION_KEY = 'splitsheet_token';
@@ -15,9 +15,17 @@ declare global {
           initTokenClient: (config: {
             client_id: string;
             scope: string;
-            callback: (response: { access_token: string; expires_in: number; token_type: string; scope: string; error?: string }) => void;
+            callback: (response: {
+              access_token: string;
+              expires_in: number;
+              token_type: string;
+              scope: string;
+              error?: string;
+            }) => void;
             error_callback?: (error: { type: string; message: string }) => void;
-          }) => { requestAccessToken: (overrides?: { prompt?: string }) => void };
+          }) => {
+            requestAccessToken: (overrides?: { prompt?: string }) => void;
+          };
         };
       };
     };
@@ -91,14 +99,14 @@ export async function signIn(clientId: string): Promise<GoogleTokenInfo> {
           expires_in: response.expires_in,
           token_type: response.token_type,
           scope: response.scope,
-          expiry_time: Date.now() + response.expires_in * 1000 - 60000,
+          expiry_time: Date.now() + response.expires_in * 1000 - 60000
         };
         storeToken(tokenInfo);
         resolve(tokenInfo);
       },
       error_callback: (error) => {
         reject(new Error(error.message || 'Sign-in failed'));
-      },
+      }
     });
 
     tokenClient.requestAccessToken({ prompt: '' });
@@ -114,7 +122,9 @@ export async function refreshToken(clientId: string): Promise<GoogleTokenInfo> {
 export function signOut(): void {
   const token = getAccessToken();
   if (token) {
-    fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, { method: 'POST' }).catch(() => {});
+    fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
+      method: 'POST'
+    }).catch(() => {});
   }
   clearToken();
 }

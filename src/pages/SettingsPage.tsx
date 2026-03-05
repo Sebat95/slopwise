@@ -7,16 +7,31 @@ import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
 import { exportToCSV, downloadCSV, parseSplitwiseCSV } from '../utils/csv';
 import {
-  LogOut, UserPlus, Download, Upload, FileSpreadsheet, ExternalLink,
-  Users, RefreshCw, Unplug
+  LogOut,
+  UserPlus,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  ExternalLink,
+  Users,
+  RefreshCw,
+  Unplug
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const {
-    spreadsheetId, spreadsheetName, members, expenses, currency,
-    addMember, importExpenses, loadData, disconnect, isLoading
+    spreadsheetId,
+    spreadsheetName,
+    members,
+    expenses,
+    currency,
+    addMember,
+    importExpenses,
+    loadData,
+    disconnect,
+    isLoading
   } = useApp();
 
   const [showAddMember, setShowAddMember] = useState(false);
@@ -52,12 +67,19 @@ export default function SettingsPage() {
 
     try {
       const text = await file.text();
-      const { members: csvMembers, expenses: csvExpenses } = parseSplitwiseCSV(text);
+      const { members: csvMembers, expenses: csvExpenses } =
+        parseSplitwiseCSV(text);
       if (csvMembers.length === 0) {
-        alert('Could not parse CSV file. Make sure it matches Splitwise export format.');
+        alert(
+          'Could not parse CSV file. Make sure it matches Splitwise export format.'
+        );
         return;
       }
-      if (window.confirm(`Import ${csvExpenses.length} expenses with ${csvMembers.length} members?`)) {
+      if (
+        window.confirm(
+          `Import ${csvExpenses.length} expenses with ${csvMembers.length} members?`
+        )
+      ) {
         await importExpenses(csvExpenses, csvMembers);
       }
     } catch (err) {
@@ -68,14 +90,22 @@ export default function SettingsPage() {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Sign out? You will need to sign in again to access your sheets.')) {
+    if (
+      window.confirm(
+        'Sign out? You will need to sign in again to access your sheets.'
+      )
+    ) {
       logout();
       navigate('/');
     }
   };
 
   const handleDisconnect = () => {
-    if (window.confirm('Disconnect from this spreadsheet? You can reconnect later.')) {
+    if (
+      window.confirm(
+        'Disconnect from this spreadsheet? You can reconnect later.'
+      )
+    ) {
       disconnect();
       navigate('/sheets');
     }
@@ -83,24 +113,30 @@ export default function SettingsPage() {
 
   return (
     <Layout>
-      <div className="px-4 py-4 max-w-lg mx-auto">
-        <h1 className="text-xl font-bold text-text-primary mb-6">Settings</h1>
+      <div className="mx-auto max-w-lg px-4 py-4">
+        <h1 className="text-text-primary mb-6 text-xl font-bold">Settings</h1>
 
         {/* Spreadsheet Info */}
         <section className="mb-6">
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Spreadsheet</h2>
-          <div className="bg-bg-card border border-border/50 rounded-xl p-4 space-y-3">
+          <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
+            Spreadsheet
+          </h2>
+          <div className="bg-bg-card border-border/50 space-y-3 rounded-xl border p-4">
             <div className="flex items-center gap-3">
               <FileSpreadsheet size={20} className="text-primary" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">{spreadsheetName}</p>
-                <p className="text-xs text-text-muted truncate">{spreadsheetId}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-text-primary truncate text-sm font-medium">
+                  {spreadsheetName}
+                </p>
+                <p className="text-text-muted truncate text-xs">
+                  {spreadsheetId}
+                </p>
               </div>
               <a
                 href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}`}
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 text-text-muted hover:text-primary rounded-lg hover:bg-bg-surface transition-colors"
+                className="text-text-muted hover:text-primary hover:bg-bg-surface rounded-lg p-2 transition-colors"
               >
                 <ExternalLink size={16} />
               </a>
@@ -110,13 +146,17 @@ export default function SettingsPage() {
               <button
                 onClick={() => loadData()}
                 disabled={isLoading}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-bg-surface text-text-primary border border-border rounded-lg px-3 py-2 text-xs font-medium hover:border-primary/30 transition-colors"
+                className="bg-bg-surface text-text-primary border-border hover:border-primary/30 flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors"
               >
-                <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+                <RefreshCw
+                  size={14}
+                  className={isLoading ? 'animate-spin' : ''}
+                />{' '}
+                Refresh
               </button>
               <button
                 onClick={handleDisconnect}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-bg-surface text-text-primary border border-border rounded-lg px-3 py-2 text-xs font-medium hover:border-warning/30 transition-colors"
+                className="bg-bg-surface text-text-primary border-border hover:border-warning/30 flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors"
               >
                 <Unplug size={14} /> Switch Sheet
               </button>
@@ -126,23 +166,23 @@ export default function SettingsPage() {
 
         {/* Members */}
         <section className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide">
-              <Users size={12} className="inline mr-1" />
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-text-muted text-xs font-semibold tracking-wide uppercase">
+              <Users size={12} className="mr-1 inline" />
               Members ({members.length})
             </h2>
             <button
               onClick={() => setShowAddMember(true)}
-              className="text-xs text-primary flex items-center gap-1 hover:underline"
+              className="text-primary flex items-center gap-1 text-xs hover:underline"
             >
               <UserPlus size={14} /> Add
             </button>
           </div>
-          <div className="bg-bg-card border border-border/50 rounded-xl divide-y divide-border/30">
+          <div className="bg-bg-card border-border/50 divide-border/30 divide-y rounded-xl border">
             {members.map((m) => (
               <div key={m} className="flex items-center gap-3 p-3">
                 <Avatar name={m} size="sm" />
-                <span className="text-sm text-text-primary">{m}</span>
+                <span className="text-text-primary text-sm">{m}</span>
               </div>
             ))}
           </div>
@@ -150,28 +190,44 @@ export default function SettingsPage() {
 
         {/* Data */}
         <section className="mb-6">
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Data</h2>
+          <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
+            Data
+          </h2>
           <div className="space-y-2">
             <button
               onClick={handleExport}
-              className="w-full flex items-center gap-3 p-3.5 bg-bg-card border border-border/50 rounded-xl hover:border-primary/30 transition-colors"
+              className="bg-bg-card border-border/50 hover:border-primary/30 flex w-full items-center gap-3 rounded-xl border p-3.5 transition-colors"
             >
               <Download size={18} className="text-primary" />
               <div className="text-left">
-                <p className="text-sm font-medium text-text-primary">Export CSV</p>
-                <p className="text-xs text-text-muted">Splitwise-compatible format</p>
+                <p className="text-text-primary text-sm font-medium">
+                  Export CSV
+                </p>
+                <p className="text-text-muted text-xs">
+                  Splitwise-compatible format
+                </p>
               </div>
             </button>
 
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleImportFile}
+            />
             <button
               onClick={() => fileRef.current?.click()}
-              className="w-full flex items-center gap-3 p-3.5 bg-bg-card border border-border/50 rounded-xl hover:border-primary/30 transition-colors"
+              className="bg-bg-card border-border/50 hover:border-primary/30 flex w-full items-center gap-3 rounded-xl border p-3.5 transition-colors"
             >
               <Upload size={18} className="text-primary" />
               <div className="text-left">
-                <p className="text-sm font-medium text-text-primary">Import CSV</p>
-                <p className="text-xs text-text-muted">Import Splitwise CSV export</p>
+                <p className="text-text-primary text-sm font-medium">
+                  Import CSV
+                </p>
+                <p className="text-text-muted text-xs">
+                  Import Splitwise CSV export
+                </p>
               </div>
             </button>
           </div>
@@ -179,52 +235,68 @@ export default function SettingsPage() {
 
         {/* Stats */}
         <section className="mb-6">
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Stats</h2>
+          <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
+            Stats
+          </h2>
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-bg-card border border-border/50 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-text-primary">{expenses.length}</p>
-              <p className="text-[10px] text-text-muted">Expenses</p>
+            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
+              <p className="text-text-primary text-lg font-bold">
+                {expenses.length}
+              </p>
+              <p className="text-text-muted text-[10px]">Expenses</p>
             </div>
-            <div className="bg-bg-card border border-border/50 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-text-primary">{members.length}</p>
-              <p className="text-[10px] text-text-muted">Members</p>
+            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
+              <p className="text-text-primary text-lg font-bold">
+                {members.length}
+              </p>
+              <p className="text-text-muted text-[10px]">Members</p>
             </div>
-            <div className="bg-bg-card border border-border/50 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-text-primary">{currency}</p>
-              <p className="text-[10px] text-text-muted">Currency</p>
+            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
+              <p className="text-text-primary text-lg font-bold">{currency}</p>
+              <p className="text-text-muted text-[10px]">Currency</p>
             </div>
           </div>
         </section>
 
         {/* Account */}
         <section>
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Account</h2>
+          <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
+            Account
+          </h2>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 p-3.5 bg-bg-card border border-danger/20 rounded-xl hover:border-danger/40 transition-colors"
+            className="bg-bg-card border-danger/20 hover:border-danger/40 flex w-full items-center gap-3 rounded-xl border p-3.5 transition-colors"
           >
             <LogOut size={18} className="text-danger" />
-            <span className="text-sm font-medium text-danger">Sign Out</span>
+            <span className="text-danger text-sm font-medium">Sign Out</span>
           </button>
         </section>
       </div>
 
       {/* Add Member Modal */}
-      <Modal open={showAddMember} onClose={() => setShowAddMember(false)} title="Add Member">
+      <Modal
+        open={showAddMember}
+        onClose={() => setShowAddMember(false)}
+        title="Add Member"
+      >
         <div className="space-y-4">
           <input
             type="text"
             value={newMemberName}
             onChange={(e) => setNewMemberName(e.target.value)}
             placeholder="Member name"
-            className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-primary"
+            className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
             autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAddMember()}
           />
           <button
             onClick={handleAddMember}
-            disabled={adding || !newMemberName.trim() || members.includes(newMemberName.trim())}
-            className="w-full bg-primary text-white rounded-xl px-4 py-3.5 font-semibold text-sm hover:bg-primary-dark disabled:opacity-50 transition-colors"
+            disabled={
+              adding ||
+              !newMemberName.trim() ||
+              members.includes(newMemberName.trim())
+            }
+            className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >
             {adding ? 'Adding...' : 'Add Member'}
           </button>

@@ -13,7 +13,8 @@ import { PlusCircle, ArrowRight, Receipt, RefreshCw } from 'lucide-react';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { spreadsheetName, members, expenses, currency, isLoading, loadData } = useApp();
+  const { spreadsheetName, members, expenses, currency, isLoading, loadData } =
+    useApp();
 
   useEffect(() => {
     if (expenses.length === 0 && !isLoading) {
@@ -39,44 +40,59 @@ export default function DashboardPage() {
 
   return (
     <Layout>
-      <div className="px-4 py-4 max-w-lg mx-auto">
+      <div className="mx-auto max-w-lg px-4 py-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-text-primary">{spreadsheetName || 'SplitSheet'}</h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-text-muted">{members.length} members</span>
+            <h1 className="text-text-primary text-xl font-bold">
+              {spreadsheetName || 'SplitSheet'}
+            </h1>
+            <div className="mt-0.5 flex items-center gap-2">
+              <span className="text-text-muted text-xs">
+                {members.length} members
+              </span>
               <SyncIndicator />
             </div>
           </div>
           <button
             onClick={() => loadData()}
             disabled={isLoading}
-            className="p-2 text-text-muted hover:text-primary rounded-lg hover:bg-bg-surface transition-colors"
+            className="text-text-muted hover:text-primary hover:bg-bg-surface rounded-lg p-2 transition-colors"
           >
             <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
           </button>
         </div>
 
         {/* Summary Card */}
-        <div className="bg-bg-card border border-border/50 rounded-2xl p-4 mb-6">
-          <div className="text-xs text-text-muted uppercase tracking-wide mb-1">Total expenses</div>
-          <div className="text-2xl font-bold text-text-primary mb-3">
+        <div className="bg-bg-card border-border/50 mb-6 rounded-2xl border p-4">
+          <div className="text-text-muted mb-1 text-xs tracking-wide uppercase">
+            Total expenses
+          </div>
+          <div className="text-text-primary mb-3 text-2xl font-bold">
             {formatCurrency(totalExpenses, currency)}
           </div>
 
           {/* Member Balances Row */}
           {members.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+            <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
               {members.map((m) => {
                 const bal = netBalances[m] || 0;
                 return (
-                  <div key={m} className="flex flex-col items-center min-w-[64px] shrink-0">
+                  <div
+                    key={m}
+                    className="flex min-w-[64px] shrink-0 flex-col items-center"
+                  >
                     <Avatar name={m} size="sm" />
-                    <span className="text-[11px] text-text-secondary mt-1 truncate max-w-[64px]">{m}</span>
+                    <span className="text-text-secondary mt-1 max-w-[64px] truncate text-[11px]">
+                      {m}
+                    </span>
                     <span
                       className={`text-[11px] font-semibold ${
-                        bal > 0.01 ? 'text-positive' : bal < -0.01 ? 'text-negative' : 'text-text-muted'
+                        bal > 0.01
+                          ? 'text-positive'
+                          : bal < -0.01
+                            ? 'text-negative'
+                            : 'text-text-muted'
                       }`}
                     >
                       {bal > 0.01 ? '+' : ''}
@@ -92,25 +108,34 @@ export default function DashboardPage() {
         {/* Outstanding Debts */}
         {debts.length > 0 && (
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">Outstanding</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-text-secondary text-sm font-semibold tracking-wide uppercase">
+                Outstanding
+              </h2>
               <button
                 onClick={() => navigate('/balances')}
-                className="text-xs text-primary flex items-center gap-0.5 hover:underline"
+                className="text-primary flex items-center gap-0.5 text-xs hover:underline"
               >
                 View all <ArrowRight size={12} />
               </button>
             </div>
             <div className="space-y-2">
               {debts.slice(0, 3).map((d, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-bg-card border border-border/50 rounded-xl">
+                <div
+                  key={i}
+                  className="bg-bg-card border-border/50 flex items-center gap-3 rounded-xl border p-3"
+                >
                   <Avatar name={d.from} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm text-text-primary font-medium">{d.from}</span>
-                    <span className="text-xs text-text-muted mx-1.5">owes</span>
-                    <span className="text-sm text-text-primary font-medium">{d.to}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-text-primary text-sm font-medium">
+                      {d.from}
+                    </span>
+                    <span className="text-text-muted mx-1.5 text-xs">owes</span>
+                    <span className="text-text-primary text-sm font-medium">
+                      {d.to}
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold text-negative">
+                  <span className="text-negative text-sm font-semibold">
                     {formatCurrency(d.amount, currency)}
                   </span>
                 </div>
@@ -122,19 +147,21 @@ export default function DashboardPage() {
         {/* Quick Add */}
         <button
           onClick={() => navigate('/add')}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-white rounded-xl px-4 py-3.5 font-semibold text-sm hover:bg-primary-dark transition-colors mb-6"
+          className="bg-primary hover:bg-primary-dark mb-6 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors"
         >
           <PlusCircle size={18} /> Add Expense
         </button>
 
         {/* Recent Activity */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">Recent</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-text-secondary text-sm font-semibold tracking-wide uppercase">
+              Recent
+            </h2>
             {expenses.length > 5 && (
               <button
                 onClick={() => navigate('/expenses')}
-                className="text-xs text-primary flex items-center gap-0.5 hover:underline"
+                className="text-primary flex items-center gap-0.5 text-xs hover:underline"
               >
                 View all <ArrowRight size={12} />
               </button>
@@ -149,7 +176,7 @@ export default function DashboardPage() {
               action={
                 <button
                   onClick={() => navigate('/add')}
-                  className="bg-primary text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-primary-dark transition-colors"
+                  className="bg-primary hover:bg-primary-dark rounded-xl px-6 py-2.5 text-sm font-medium text-white transition-colors"
                 >
                   Add Expense
                 </button>

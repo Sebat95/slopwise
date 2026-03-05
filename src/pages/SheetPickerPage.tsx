@@ -6,7 +6,16 @@ import { parseSplitwiseCSV } from '../utils/csv';
 import type { SpreadsheetInfo } from '../types';
 import { CURRENCIES } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { FileSpreadsheet, Plus, Upload, Search, Clock, ArrowRight, ChevronLeft, Users } from 'lucide-react';
+import {
+  FileSpreadsheet,
+  Plus,
+  Upload,
+  Search,
+  Clock,
+  ArrowRight,
+  ChevronLeft,
+  Users
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 type View = 'list' | 'create' | 'import';
@@ -35,7 +44,9 @@ export default function SheetPickerPage() {
       const data = await listSpreadsheets();
       setSheets(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to list spreadsheets');
+      setError(
+        err instanceof Error ? err.message : 'Failed to list spreadsheets'
+      );
     } finally {
       setLoading(false);
     }
@@ -52,14 +63,19 @@ export default function SheetPickerPage() {
       await loadData();
       navigate('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to open spreadsheet');
+      setError(
+        err instanceof Error ? err.message : 'Failed to open spreadsheet'
+      );
       setLoading(false);
     }
   };
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    const members = newMembers.split(',').map((m) => m.trim()).filter(Boolean);
+    const members = newMembers
+      .split(',')
+      .map((m) => m.trim())
+      .filter(Boolean);
     if (members.length < 2) {
       setError('Add at least 2 members (comma-separated)');
       return;
@@ -73,7 +89,9 @@ export default function SheetPickerPage() {
       await loadData();
       navigate('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create spreadsheet');
+      setError(
+        err instanceof Error ? err.message : 'Failed to create spreadsheet'
+      );
       setCreating(false);
     }
   };
@@ -87,12 +105,15 @@ export default function SheetPickerPage() {
       const text = await importFile.text();
       const { members, expenses } = parseSplitwiseCSV(text);
       if (members.length === 0) {
-        setError('Could not parse CSV. Make sure it matches Splitwise export format.');
+        setError(
+          'Could not parse CSV. Make sure it matches Splitwise export format.'
+        );
         setImporting(false);
         return;
       }
 
-      const name = importFile.name.replace(/\.csv$/i, '') || 'Imported Expenses';
+      const name =
+        importFile.name.replace(/\.csv$/i, '') || 'Imported Expenses';
       const id = await createSpreadsheet(name, members, currency);
       selectSpreadsheet(id, name);
       await importExpenses(expenses, members);
@@ -104,31 +125,40 @@ export default function SheetPickerPage() {
     }
   };
 
-  const filtered = sheets.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = sheets.filter((s) =>
+    s.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   if (view === 'create') {
     return (
-      <div className="min-h-full px-4 py-6 max-w-lg mx-auto">
-        <button onClick={() => setView('list')} className="flex items-center gap-1 text-text-secondary text-sm mb-6 hover:text-text-primary transition-colors">
+      <div className="mx-auto min-h-full max-w-lg px-4 py-6">
+        <button
+          onClick={() => setView('list')}
+          className="text-text-secondary hover:text-text-primary mb-6 flex items-center gap-1 text-sm transition-colors"
+        >
           <ChevronLeft size={16} /> Back
         </button>
-        <h1 className="text-2xl font-bold text-text-primary mb-6">New Expense Group</h1>
+        <h1 className="text-text-primary mb-6 text-2xl font-bold">
+          New Expense Group
+        </h1>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Group Name</label>
+            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
+              Group Name
+            </label>
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="e.g., Trip to Paris"
-              className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-primary"
+              className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">
-              <Users size={12} className="inline mr-1" />
+            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
+              <Users size={12} className="mr-1 inline" />
               Members (comma-separated)
             </label>
             <input
@@ -136,31 +166,37 @@ export default function SheetPickerPage() {
               value={newMembers}
               onChange={(e) => setNewMembers(e.target.value)}
               placeholder="e.g., Alice, Bob, Charlie"
-              className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-primary"
+              className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Currency</label>
+            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
+              Currency
+            </label>
             <select
               value={newCurrency}
               onChange={(e) => setNewCurrency(e.target.value)}
-              className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-text-primary text-sm focus:outline-none focus:border-primary appearance-none"
+              className="bg-bg-input border-border text-text-primary focus:border-primary w-full appearance-none rounded-xl border px-4 py-3 text-sm focus:outline-none"
             >
               {CURRENCIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
           </div>
 
           {error && (
-            <p className="text-danger text-sm bg-danger/10 rounded-xl p-3">{error}</p>
+            <p className="text-danger bg-danger/10 rounded-xl p-3 text-sm">
+              {error}
+            </p>
           )}
 
           <button
             onClick={handleCreate}
             disabled={creating || !newName.trim()}
-            className="w-full bg-primary text-white rounded-xl px-4 py-3.5 font-semibold text-sm hover:bg-primary-dark disabled:opacity-50 transition-colors"
+            className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >
             {creating ? 'Creating...' : 'Create Group'}
           </button>
@@ -171,13 +207,19 @@ export default function SheetPickerPage() {
 
   if (view === 'import') {
     return (
-      <div className="min-h-full px-4 py-6 max-w-lg mx-auto">
-        <button onClick={() => setView('list')} className="flex items-center gap-1 text-text-secondary text-sm mb-6 hover:text-text-primary transition-colors">
+      <div className="mx-auto min-h-full max-w-lg px-4 py-6">
+        <button
+          onClick={() => setView('list')}
+          className="text-text-secondary hover:text-text-primary mb-6 flex items-center gap-1 text-sm transition-colors"
+        >
           <ChevronLeft size={16} /> Back
         </button>
-        <h1 className="text-2xl font-bold text-text-primary mb-2">Import from CSV</h1>
-        <p className="text-sm text-text-secondary mb-6">
-          Import a Splitwise CSV export. The app will create a new spreadsheet with the imported data.
+        <h1 className="text-text-primary mb-2 text-2xl font-bold">
+          Import from CSV
+        </h1>
+        <p className="text-text-secondary mb-6 text-sm">
+          Import a Splitwise CSV export. The app will create a new spreadsheet
+          with the imported data.
         </p>
 
         <div className="space-y-4">
@@ -190,22 +232,24 @@ export default function SheetPickerPage() {
           />
           <button
             onClick={() => fileRef.current?.click()}
-            className="w-full border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors"
+            className="border-border hover:border-primary/50 w-full rounded-xl border-2 border-dashed p-8 text-center transition-colors"
           >
-            <Upload size={24} className="mx-auto mb-2 text-text-muted" />
-            <p className="text-sm text-text-secondary">
+            <Upload size={24} className="text-text-muted mx-auto mb-2" />
+            <p className="text-text-secondary text-sm">
               {importFile ? importFile.name : 'Click to select CSV file'}
             </p>
           </button>
 
           {error && (
-            <p className="text-danger text-sm bg-danger/10 rounded-xl p-3">{error}</p>
+            <p className="text-danger bg-danger/10 rounded-xl p-3 text-sm">
+              {error}
+            </p>
           )}
 
           <button
             onClick={handleImport}
             disabled={importing || !importFile}
-            className="w-full bg-primary text-white rounded-xl px-4 py-3.5 font-semibold text-sm hover:bg-primary-dark disabled:opacity-50 transition-colors"
+            className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >
             {importing ? 'Importing...' : 'Import & Create Sheet'}
           </button>
@@ -215,45 +259,54 @@ export default function SheetPickerPage() {
   }
 
   return (
-    <div className="min-h-full px-4 py-6 max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-text-primary mb-1">Choose a Spreadsheet</h1>
-      <p className="text-sm text-text-secondary mb-6">Select an existing sheet or create a new one</p>
+    <div className="mx-auto min-h-full max-w-lg px-4 py-6">
+      <h1 className="text-text-primary mb-1 text-2xl font-bold">
+        Choose a Spreadsheet
+      </h1>
+      <p className="text-text-secondary mb-6 text-sm">
+        Select an existing sheet or create a new one
+      </p>
 
-      <div className="flex gap-2 mb-4">
+      <div className="mb-4 flex gap-2">
         <button
           onClick={() => setView('create')}
-          className="flex-1 flex items-center justify-center gap-2 bg-primary text-white rounded-xl px-4 py-3 text-sm font-medium hover:bg-primary-dark transition-colors"
+          className="bg-primary hover:bg-primary-dark flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white transition-colors"
         >
           <Plus size={18} /> New Group
         </button>
         <button
           onClick={() => setView('import')}
-          className="flex-1 flex items-center justify-center gap-2 bg-bg-surface text-text-primary border border-border rounded-xl px-4 py-3 text-sm font-medium hover:border-primary/50 transition-colors"
+          className="bg-bg-surface text-text-primary border-border hover:border-primary/50 flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition-colors"
         >
           <Upload size={18} /> Import CSV
         </button>
       </div>
 
       <div className="relative mb-4">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+        <Search
+          size={16}
+          className="text-text-muted absolute top-1/2 left-3 -translate-y-1/2"
+        />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search spreadsheets..."
-          className="w-full bg-bg-input border border-border rounded-xl pl-9 pr-4 py-2.5 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-primary"
+          className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm focus:outline-none"
         />
       </div>
 
       {error && (
-        <p className="text-danger text-sm bg-danger/10 rounded-xl p-3 mb-4">{error}</p>
+        <p className="text-danger bg-danger/10 mb-4 rounded-xl p-3 text-sm">
+          {error}
+        </p>
       )}
 
       {loading ? (
         <LoadingSpinner text="Loading your spreadsheets..." />
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12">
-          <FileSpreadsheet size={40} className="mx-auto text-text-muted mb-3" />
+        <div className="py-12 text-center">
+          <FileSpreadsheet size={40} className="text-text-muted mx-auto mb-3" />
           <p className="text-text-secondary text-sm">No spreadsheets found</p>
         </div>
       ) : (
@@ -262,15 +315,17 @@ export default function SheetPickerPage() {
             <button
               key={sheet.id}
               onClick={() => handleSelect(sheet)}
-              className="w-full flex items-center gap-3 p-3.5 bg-bg-card border border-border/50 rounded-xl hover:border-primary/50 transition-colors text-left"
+              className="bg-bg-card border-border/50 hover:border-primary/50 flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-colors"
             >
-              <div className="w-10 h-10 bg-bg-surface rounded-lg flex items-center justify-center shrink-0">
+              <div className="bg-bg-surface flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
                 <FileSpreadsheet size={20} className="text-primary" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-text-primary truncate">{sheet.name}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-text-primary truncate font-medium">
+                  {sheet.name}
+                </p>
                 {sheet.modifiedTime && (
-                  <p className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
+                  <p className="text-text-muted mt-0.5 flex items-center gap-1 text-xs">
                     <Clock size={10} />
                     {format(parseISO(sheet.modifiedTime), 'MMM d, yyyy')}
                   </p>

@@ -1,5 +1,17 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { signIn, signOut as authSignOut, isTokenValid, getAccessToken } from '../services/google-auth';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactNode
+} from 'react';
+import {
+  signIn,
+  signOut as authSignOut,
+  isTokenValid,
+  getAccessToken
+} from '../services/google-auth';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -24,7 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: isTokenValid(),
     isLoading: false,
     error: null,
-    clientId: localStorage.getItem(CLIENT_ID_KEY) || import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    clientId:
+      localStorage.getItem(CLIENT_ID_KEY) ||
+      import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+      ''
   });
 
   useEffect(() => {
@@ -43,7 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async () => {
     if (!state.clientId) {
-      setState((s) => ({ ...s, error: 'Please enter a Google OAuth Client ID' }));
+      setState((s) => ({
+        ...s,
+        error: 'Please enter a Google OAuth Client ID'
+      }));
       return;
     }
     setState((s) => ({ ...s, isLoading: true, error: null }));
@@ -54,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState((s) => ({
         ...s,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Sign-in failed',
+        error: err instanceof Error ? err.message : 'Sign-in failed'
       }));
     }
   }, [state.clientId]);
@@ -73,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setClientId,
         login,
         logout,
-        accessToken: getAccessToken(),
+        accessToken: getAccessToken()
       }}
     >
       {children}

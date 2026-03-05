@@ -6,7 +6,13 @@ import Modal from '../components/Modal';
 import EmptyState from '../components/EmptyState';
 import { calculateNetBalances, simplifyDebts } from '../utils/balance';
 import { formatCurrency } from '../utils/format';
-import { Scale, ArrowRight, Handshake, TrendingUp, TrendingDown } from 'lucide-react';
+import {
+  Scale,
+  ArrowRight,
+  Handshake,
+  TrendingUp,
+  TrendingDown
+} from 'lucide-react';
 
 export default function BalancesPage() {
   const { members, expenses, currency, settleUp } = useApp();
@@ -28,7 +34,8 @@ export default function BalancesPage() {
 
   const handleSettle = async () => {
     const amt = parseFloat(settleAmount);
-    if (!settleFrom || !settleTo || settleFrom === settleTo || !amt || amt <= 0) return;
+    if (!settleFrom || !settleTo || settleFrom === settleTo || !amt || amt <= 0)
+      return;
 
     setSettling(true);
     try {
@@ -40,16 +47,18 @@ export default function BalancesPage() {
     }
   };
 
-  const sorted = [...members].sort((a, b) => (netBalances[b] || 0) - (netBalances[a] || 0));
+  const sorted = [...members].sort(
+    (a, b) => (netBalances[b] || 0) - (netBalances[a] || 0)
+  );
 
   return (
     <Layout>
-      <div className="px-4 py-4 max-w-lg mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold text-text-primary">Balances</h1>
+      <div className="mx-auto max-w-lg px-4 py-4">
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-text-primary text-xl font-bold">Balances</h1>
           <button
             onClick={() => openSettle()}
-            className="flex items-center gap-1.5 bg-primary text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-primary-dark transition-colors"
+            className="bg-primary hover:bg-primary-dark flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-colors"
           >
             <Handshake size={16} /> Settle Up
           </button>
@@ -65,26 +74,43 @@ export default function BalancesPage() {
           <>
             {/* Net Balances */}
             <div className="mb-6">
-              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Net Balances</h2>
+              <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
+                Net Balances
+              </h2>
               <div className="space-y-2">
                 {sorted.map((m) => {
                   const bal = netBalances[m] || 0;
-                  const maxBal = Math.max(...Object.values(netBalances).map(Math.abs), 1);
-                  const pct = Math.abs(bal) / maxBal * 100;
+                  const maxBal = Math.max(
+                    ...Object.values(netBalances).map(Math.abs),
+                    1
+                  );
+                  const pct = (Math.abs(bal) / maxBal) * 100;
                   return (
-                    <div key={m} className="p-3 bg-bg-card border border-border/50 rounded-xl">
-                      <div className="flex items-center gap-3 mb-2">
+                    <div
+                      key={m}
+                      className="bg-bg-card border-border/50 rounded-xl border p-3"
+                    >
+                      <div className="mb-2 flex items-center gap-3">
                         <Avatar name={m} size="sm" />
-                        <span className="text-sm font-medium text-text-primary flex-1">{m}</span>
+                        <span className="text-text-primary flex-1 text-sm font-medium">
+                          {m}
+                        </span>
                         <div className="flex items-center gap-1">
-                          {bal > 0.01 && <TrendingUp size={14} className="text-positive" />}
-                          {bal < -0.01 && <TrendingDown size={14} className="text-negative" />}
-                          <span className={`text-sm font-bold ${bal > 0.01 ? 'text-positive' : bal < -0.01 ? 'text-negative' : 'text-text-muted'}`}>
-                            {bal > 0 ? '+' : ''}{formatCurrency(bal, currency)}
+                          {bal > 0.01 && (
+                            <TrendingUp size={14} className="text-positive" />
+                          )}
+                          {bal < -0.01 && (
+                            <TrendingDown size={14} className="text-negative" />
+                          )}
+                          <span
+                            className={`text-sm font-bold ${bal > 0.01 ? 'text-positive' : bal < -0.01 ? 'text-negative' : 'text-text-muted'}`}
+                          >
+                            {bal > 0 ? '+' : ''}
+                            {formatCurrency(bal, currency)}
                           </span>
                         </div>
                       </div>
-                      <div className="h-1.5 bg-bg-surface rounded-full overflow-hidden">
+                      <div className="bg-bg-surface h-1.5 overflow-hidden rounded-full">
                         <div
                           className={`h-full rounded-full transition-all ${bal >= 0 ? 'bg-positive' : 'bg-negative'}`}
                           style={{ width: `${pct}%` }}
@@ -99,26 +125,35 @@ export default function BalancesPage() {
             {/* Simplified Debts */}
             {debts.length > 0 && (
               <div>
-                <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
-                  Simplified Debts ({debts.length} payment{debts.length !== 1 ? 's' : ''})
+                <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
+                  Simplified Debts ({debts.length} payment
+                  {debts.length !== 1 ? 's' : ''})
                 </h2>
                 <div className="space-y-2">
                   {debts.map((d, i) => (
                     <button
                       key={i}
                       onClick={() => openSettle(d.from, d.to, d.amount)}
-                      className="w-full flex items-center gap-3 p-3.5 bg-bg-card border border-border/50 rounded-xl hover:border-primary/30 transition-colors text-left"
+                      className="bg-bg-card border-border/50 hover:border-primary/30 flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-colors"
                     >
                       <Avatar name={d.from} size="sm" />
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-text-primary">{d.from}</span>
+                          <span className="text-text-primary text-sm font-medium">
+                            {d.from}
+                          </span>
                           <ArrowRight size={14} className="text-text-muted" />
-                          <span className="text-sm font-medium text-text-primary">{d.to}</span>
+                          <span className="text-text-primary text-sm font-medium">
+                            {d.to}
+                          </span>
                         </div>
-                        <p className="text-xs text-text-muted mt-0.5">Tap to settle</p>
+                        <p className="text-text-muted mt-0.5 text-xs">
+                          Tap to settle
+                        </p>
                       </div>
-                      <span className="text-sm font-bold text-negative">{formatCurrency(d.amount, currency)}</span>
+                      <span className="text-negative text-sm font-bold">
+                        {formatCurrency(d.amount, currency)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -137,17 +172,25 @@ export default function BalancesPage() {
       </div>
 
       {/* Settle Up Modal */}
-      <Modal open={showSettle} onClose={() => setShowSettle(false)} title="Settle Up">
+      <Modal
+        open={showSettle}
+        onClose={() => setShowSettle(false)}
+        title="Settle Up"
+      >
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-text-secondary mb-1.5 block">Who is paying?</label>
+            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
+              Who is paying?
+            </label>
             <select
               value={settleFrom}
               onChange={(e) => setSettleFrom(e.target.value)}
-              className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-text-primary text-sm focus:outline-none focus:border-primary appearance-none"
+              className="bg-bg-input border-border text-text-primary focus:border-primary w-full appearance-none rounded-xl border px-4 py-3 text-sm focus:outline-none"
             >
               {members.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </div>
@@ -157,20 +200,28 @@ export default function BalancesPage() {
           </div>
 
           <div>
-            <label className="text-xs font-medium text-text-secondary mb-1.5 block">Who is receiving?</label>
+            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
+              Who is receiving?
+            </label>
             <select
               value={settleTo}
               onChange={(e) => setSettleTo(e.target.value)}
-              className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-text-primary text-sm focus:outline-none focus:border-primary appearance-none"
+              className="bg-bg-input border-border text-text-primary focus:border-primary w-full appearance-none rounded-xl border px-4 py-3 text-sm focus:outline-none"
             >
-              {members.filter((m) => m !== settleFrom).map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
+              {members
+                .filter((m) => m !== settleFrom)
+                .map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
             </select>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-text-secondary mb-1.5 block">Amount</label>
+            <label className="text-text-secondary mb-1.5 block text-xs font-medium">
+              Amount
+            </label>
             <input
               type="number"
               value={settleAmount}
@@ -178,14 +229,20 @@ export default function BalancesPage() {
               placeholder="0.00"
               step="0.01"
               min="0"
-              className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-primary"
+              className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
             />
           </div>
 
           <button
             onClick={handleSettle}
-            disabled={settling || !settleFrom || !settleTo || settleFrom === settleTo || !parseFloat(settleAmount)}
-            className="w-full bg-primary text-white rounded-xl px-4 py-3.5 font-semibold text-sm hover:bg-primary-dark disabled:opacity-50 transition-colors"
+            disabled={
+              settling ||
+              !settleFrom ||
+              !settleTo ||
+              settleFrom === settleTo ||
+              !parseFloat(settleAmount)
+            }
+            className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >
             {settling ? 'Recording...' : 'Record Payment'}
           </button>

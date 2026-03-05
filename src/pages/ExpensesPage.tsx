@@ -23,8 +23,10 @@ export default function ExpensesPage() {
   const filtered = useMemo(
     () =>
       sorted.filter((e) => {
-        const matchSearch = !search || e.description.toLowerCase().includes(search.toLowerCase());
-        const matchCategory = categoryFilter === 'all' || e.category === categoryFilter;
+        const matchSearch =
+          !search || e.description.toLowerCase().includes(search.toLowerCase());
+        const matchCategory =
+          categoryFilter === 'all' || e.category === categoryFilter;
         return matchSearch && matchCategory;
       }),
     [sorted, search, categoryFilter]
@@ -46,36 +48,41 @@ export default function ExpensesPage() {
 
   return (
     <Layout>
-      <div className="px-4 py-4 max-w-lg mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-text-primary">Expenses</h1>
+      <div className="mx-auto max-w-lg px-4 py-4">
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-text-primary text-xl font-bold">Expenses</h1>
           <button
             onClick={() => navigate('/add')}
-            className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            className="text-primary hover:bg-primary/10 rounded-lg p-2 transition-colors"
           >
             <PlusCircle size={22} />
           </button>
         </div>
 
         {/* Search & Filter */}
-        <div className="flex gap-2 mb-4">
+        <div className="mb-4 flex gap-2">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Search
+              size={16}
+              className="text-text-muted absolute top-1/2 left-3 -translate-y-1/2"
+            />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search expenses..."
-              className="w-full bg-bg-input border border-border rounded-xl pl-9 pr-4 py-2.5 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-primary"
+              className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm focus:outline-none"
             />
           </div>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-bg-input border border-border rounded-xl px-3 py-2.5 text-text-primary text-sm focus:outline-none focus:border-primary appearance-none min-w-[100px]"
+            className="bg-bg-input border-border text-text-primary focus:border-primary min-w-[100px] appearance-none rounded-xl border px-3 py-2.5 text-sm focus:outline-none"
           >
             {categories.map((c) => (
-              <option key={c} value={c}>{c === 'all' ? 'All' : c}</option>
+              <option key={c} value={c}>
+                {c === 'all' ? 'All' : c}
+              </option>
             ))}
           </select>
         </div>
@@ -84,12 +91,14 @@ export default function ExpensesPage() {
           <EmptyState
             icon={<Receipt size={40} />}
             title={search ? 'No matches' : 'No expenses yet'}
-            description={search ? 'Try a different search term' : 'Add your first expense'}
+            description={
+              search ? 'Try a different search term' : 'Add your first expense'
+            }
             action={
               !search ? (
                 <button
                   onClick={() => navigate('/add')}
-                  className="bg-primary text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-primary-dark transition-colors"
+                  className="bg-primary hover:bg-primary-dark rounded-xl px-6 py-2.5 text-sm font-medium text-white transition-colors"
                 >
                   Add Expense
                 </button>
@@ -100,7 +109,7 @@ export default function ExpensesPage() {
           <div className="space-y-5">
             {grouped.map(([date, items]) => (
               <div key={date}>
-                <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+                <h3 className="text-text-muted mb-2 text-xs font-semibold tracking-wide uppercase">
                   {(() => {
                     try {
                       return format(parseISO(date), 'EEEE, MMMM d, yyyy');
@@ -111,7 +120,11 @@ export default function ExpensesPage() {
                 </h3>
                 <div className="space-y-2">
                   {items.map((e) => (
-                    <ExpenseCard key={e.id} expense={e} onDelete={handleDelete} />
+                    <ExpenseCard
+                      key={e.id}
+                      expense={e}
+                      onDelete={handleDelete}
+                    />
                   ))}
                 </div>
               </div>

@@ -6,7 +6,7 @@ export default function SyncIndicator() {
 
   if (error) {
     return (
-      <div className="flex items-center gap-1.5 text-danger text-xs">
+      <div className="text-danger flex items-center gap-1.5 text-xs">
         <CloudOff size={14} />
         <span>Sync error</span>
       </div>
@@ -15,7 +15,7 @@ export default function SyncIndicator() {
 
   if (isSyncing) {
     return (
-      <div className="flex items-center gap-1.5 text-warning text-xs">
+      <div className="text-warning flex items-center gap-1.5 text-xs">
         <Loader2 size={14} className="animate-spin" />
         <span>Saving...</span>
       </div>
@@ -23,7 +23,7 @@ export default function SyncIndicator() {
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-positive text-xs">
+    <div className="text-positive flex items-center gap-1.5 text-xs">
       <Cloud size={14} />
       <span>Synced</span>
     </div>

@@ -70,12 +70,13 @@ Open http://localhost:5173
 
 The app stores data in Splitwise-compatible CSV format:
 
-| Date | Description | Category | Cost | Currency | Alice | Bob | Charlie |
-|------|-------------|----------|------|----------|-------|-----|---------|
-| 2024-01-15 | Dinner | Food & Drink | 60.00 | USD | 40.00 | -20.00 | -20.00 |
-| 2024-01-16 | Taxi | Transportation | 30.00 | USD | -15.00 | 15.00 | 0.00 |
+| Date       | Description | Category       | Cost  | Currency | Alice  | Bob    | Charlie |
+| ---------- | ----------- | -------------- | ----- | -------- | ------ | ------ | ------- |
+| 2024-01-15 | Dinner      | Food & Drink   | 60.00 | USD      | 40.00  | -20.00 | -20.00  |
+| 2024-01-16 | Taxi        | Transportation | 30.00 | USD      | -15.00 | 15.00  | 0.00    |
 
 Each member column shows their **net** for that expense:
+
 - **Positive** = they are owed money (paid more than their share)
 - **Negative** = they owe money
 - **Zero** = not involved or fully settled

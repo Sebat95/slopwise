@@ -8,13 +8,21 @@ const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 function authHeaders(): HeadersInit {
   const token = getAccessToken();
   if (!token) throw new Error('Not authenticated');
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  return {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
 }
 
 async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...options, headers: { ...authHeaders(), ...options?.headers } });
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...authHeaders(), ...options?.headers }
+  });
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: { message: res.statusText } }));
+    const error = await res
+      .json()
+      .catch(() => ({ error: { message: res.statusText } }));
     throw new Error(error.error?.message || `API error: ${res.status}`);
   }
   return res.json();
@@ -23,17 +31,30 @@ async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
 export async function listSpreadsheets(): Promise<SpreadsheetInfo[]> {
   const data = await apiRequest<{
     files: { id: string; name: string; modifiedTime: string }[];
-  }>(`${DRIVE_API}?q=mimeType='application/vnd.google-apps.spreadsheet'&orderBy=modifiedTime desc&pageSize=50&fields=files(id,name,modifiedTime)`);
+  }>(
+    `${DRIVE_API}?q=mimeType='application/vnd.google-apps.spreadsheet'&orderBy=modifiedTime desc&pageSize=50&fields=files(id,name,modifiedTime)`
+  );
 
   return data.files.map((f) => ({
     id: f.id,
     name: f.name,
-    modifiedTime: f.modifiedTime,
+    modifiedTime: f.modifiedTime
   }));
 }
 
-export async function createSpreadsheet(name: string, members: string[], currency: string): Promise<string> {
-  const headers = ['Date', 'Description', 'Category', 'Cost', 'Currency', ...members];
+export async function createSpreadsheet(
+  name: string,
+  members: string[],
+  currency: string
+): Promise<string> {
+  const headers = [
+    'Date',
+    'Description',
+    'Category',
+    'Cost',
+    'Currency',
+    ...members
+  ];
   const data = await apiRequest<{ spreadsheetId: string }>(`${SHEETS_API}`, {
     method: 'POST',
     body: JSON.stringify({
@@ -45,9 +66,15 @@ export async function createSpreadsheet(name: string, members: string[], currenc
             {
               startRow: 0,
               startColumn: 0,
-              rowData: [{ values: headers.map((h) => ({ userEnteredValue: { stringValue: h } })) }],
-            },
-          ],
+              rowData: [
+                {
+                  values: headers.map((h) => ({
+                    userEnteredValue: { stringValue: h }
+                  }))
+                }
+              ]
+            }
+          ]
         },
         {
           properties: { title: '_settings', index: 1 },
@@ -56,38 +83,53 @@ export async function createSpreadsheet(name: string, members: string[], currenc
               startRow: 0,
               startColumn: 0,
               rowData: [
-                { values: [{ userEnteredValue: { stringValue: 'currency' } }, { userEnteredValue: { stringValue: currency } }] },
-              ],
-            },
-          ],
-        },
-      ],
-    }),
+                {
+                  values: [
+                    { userEnteredValue: { stringValue: 'currency' } },
+                    { userEnteredValue: { stringValue: currency } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    })
   });
   return data.spreadsheetId;
 }
 
-export async function getSpreadsheetInfo(spreadsheetId: string): Promise<{ title: string; sheets: string[] }> {
+export async function getSpreadsheetInfo(
+  spreadsheetId: string
+): Promise<{ title: string; sheets: string[] }> {
   const data = await apiRequest<{
     properties: { title: string };
     sheets: { properties: { title: string } }[];
-  }>(`${SHEETS_API}/${spreadsheetId}?fields=properties.title,sheets.properties.title`);
+  }>(
+    `${SHEETS_API}/${spreadsheetId}?fields=properties.title,sheets.properties.title`
+  );
 
   return {
     title: data.properties.title,
-    sheets: data.sheets.map((s) => s.properties.title),
+    sheets: data.sheets.map((s) => s.properties.title)
   };
 }
 
 export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
   const [expenseData, settingsData] = await Promise.all([
-    apiRequest<{ values?: string[][] }>(`${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:ZZ10000`).catch(() => ({ values: undefined })),
-    apiRequest<{ values?: string[][] }>(`${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B10`).catch(() => ({ values: undefined })),
+    apiRequest<{ values?: string[][] }>(
+      `${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:ZZ10000`
+    ).catch(() => ({ values: undefined })),
+    apiRequest<{ values?: string[][] }>(
+      `${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B10`
+    ).catch(() => ({ values: undefined }))
   ]);
 
   let currency = 'EUR';
   if (settingsData.values) {
-    const currRow = settingsData.values.find((r) => r[0].toLowerCase() === 'currency');
+    const currRow = settingsData.values.find(
+      (r) => r[0].toLowerCase() === 'currency'
+    );
     if (currRow?.[1]) currency = currRow[1];
   }
 
@@ -131,7 +173,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       paidBy,
       splitType: 'equal',
       splits,
-      notes: '',
+      notes: ''
     });
   }
   return { members: memberNames, expenses, currency };
@@ -144,53 +186,87 @@ function expenseToRow(expense: Expense, members: string[]): string[] {
     expense.category,
     expense.cost.toFixed(2),
     expense.currency,
-    ...members.map((m) => (expense.splits[m] ?? 0).toFixed(2)),
+    ...members.map((m) => (expense.splits[m] ?? 0).toFixed(2))
   ];
 }
 
-export async function appendExpense(spreadsheetId: string, expense: Expense, members: string[]): Promise<void> {
+export async function appendExpense(
+  spreadsheetId: string,
+  expense: Expense,
+  members: string[]
+): Promise<void> {
   const row = expenseToRow(expense, members);
-  await apiRequest(`${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
-    method: 'POST',
-    body: JSON.stringify({ values: [row] }),
-  });
+  await apiRequest(
+    `${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ values: [row] })
+    }
+  );
 }
 
-export async function writeAllExpenses(spreadsheetId: string, expenses: Expense[], members: string[], _currency: string): Promise<void> {
-  const headers = ['Date', 'Description', 'Category', 'Cost', 'Currency', ...members];
+export async function writeAllExpenses(
+  spreadsheetId: string,
+  expenses: Expense[],
+  members: string[],
+  _currency: string
+): Promise<void> {
+  const headers = [
+    'Date',
+    'Description',
+    'Category',
+    'Cost',
+    'Currency',
+    ...members
+  ];
   const rows = [headers, ...expenses.map((e) => expenseToRow(e, members))];
 
-  await apiRequest(`${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:ZZ10000?valueInputOption=USER_ENTERED`, {
-    method: 'PUT',
-    body: JSON.stringify({ values: rows }),
-  });
+  await apiRequest(
+    `${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:ZZ10000?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ values: rows })
+    }
+  );
 }
 
-export async function addMemberColumn(spreadsheetId: string, members: string[], newMember: string): Promise<void> {
+export async function addMemberColumn(
+  spreadsheetId: string,
+  members: string[],
+  newMember: string
+): Promise<void> {
   const colIndex = 5 + members.length;
   const colLetter = String.fromCharCode(65 + colIndex);
   await apiRequest(
     `${SHEETS_API}/${spreadsheetId}/values/Expenses!${colLetter}1?valueInputOption=USER_ENTERED`,
     {
       method: 'PUT',
-      body: JSON.stringify({ values: [[newMember]] }),
+      body: JSON.stringify({ values: [[newMember]] })
     }
   );
 }
 
 export async function clearSheet(spreadsheetId: string): Promise<void> {
-  await apiRequest(`${SHEETS_API}/${spreadsheetId}/values/Expenses!A2:ZZ10000:clear`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
+  await apiRequest(
+    `${SHEETS_API}/${spreadsheetId}/values/Expenses!A2:ZZ10000:clear`,
+    {
+      method: 'POST',
+      body: JSON.stringify({})
+    }
+  );
 }
 
-export async function deleteExpenseRow(spreadsheetId: string, rowIndex: number): Promise<void> {
+export async function deleteExpenseRow(
+  spreadsheetId: string,
+  rowIndex: number
+): Promise<void> {
   const sheetInfo = await apiRequest<{
     sheets: { properties: { sheetId: number; title: string } }[];
   }>(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`);
 
-  const expensesSheet = sheetInfo.sheets.find((s) => s.properties.title === 'Expenses');
+  const expensesSheet = sheetInfo.sheets.find(
+    (s) => s.properties.title === 'Expenses'
+  );
   if (!expensesSheet) throw new Error('Expenses sheet not found');
 
   await apiRequest(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
@@ -203,44 +279,61 @@ export async function deleteExpenseRow(spreadsheetId: string, rowIndex: number):
               sheetId: expensesSheet.properties.sheetId,
               dimension: 'ROWS',
               startIndex: rowIndex + 1,
-              endIndex: rowIndex + 2,
-            },
-          },
-        },
-      ],
-    }),
+              endIndex: rowIndex + 2
+            }
+          }
+        }
+      ]
+    })
   });
 }
 
-export async function initializeSheetIfNeeded(spreadsheetId: string, members: string[], currency: string): Promise<void> {
+export async function initializeSheetIfNeeded(
+  spreadsheetId: string,
+  members: string[],
+  currency: string
+): Promise<void> {
   const info = await getSpreadsheetInfo(spreadsheetId);
 
   if (!info.sheets.includes('_settings')) {
     await apiRequest(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
       method: 'POST',
       body: JSON.stringify({
-        requests: [{ addSheet: { properties: { title: '_settings' } } }],
-      }),
+        requests: [{ addSheet: { properties: { title: '_settings' } } }]
+      })
     });
 
-    await apiRequest(`${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B1?valueInputOption=USER_ENTERED`, {
-      method: 'PUT',
-      body: JSON.stringify({ values: [['currency', currency]] }),
-    });
+    await apiRequest(
+      `${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B1?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ values: [['currency', currency]] })
+      }
+    );
   }
 
   if (!info.sheets.includes('Expenses')) {
     await apiRequest(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
       method: 'POST',
       body: JSON.stringify({
-        requests: [{ addSheet: { properties: { title: 'Expenses' } } }],
-      }),
+        requests: [{ addSheet: { properties: { title: 'Expenses' } } }]
+      })
     });
 
-    const headers = ['Date', 'Description', 'Category', 'Cost', 'Currency', ...members];
-    await apiRequest(`${SHEETS_API}/${spreadsheetId}/values/Expenses!A1?valueInputOption=USER_ENTERED`, {
-      method: 'PUT',
-      body: JSON.stringify({ values: [headers] }),
-    });
+    const headers = [
+      'Date',
+      'Description',
+      'Category',
+      'Cost',
+      'Currency',
+      ...members
+    ];
+    await apiRequest(
+      `${SHEETS_API}/${spreadsheetId}/values/Expenses!A1?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ values: [headers] })
+      }
+    );
   }
 }

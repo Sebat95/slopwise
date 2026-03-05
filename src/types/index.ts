@@ -69,7 +69,18 @@ export const CATEGORIES = [
   'Insurance',
   'Taxes',
   'Payment',
-  'Other',
+  'Other'
 ] as const;
 
-export const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'INR', 'CHF', 'CNY', 'BRL'] as const;
+export const CURRENCIES = [
+  'USD',
+  'EUR',
+  'GBP',
+  'CAD',
+  'AUD',
+  'JPY',
+  'INR',
+  'CHF',
+  'CNY',
+  'BRL'
+] as const;

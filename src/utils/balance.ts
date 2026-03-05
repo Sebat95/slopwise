@@ -1,6 +1,9 @@
 import type { Expense, Balance } from '../types';
 
-export function calculateNetBalances(expenses: Expense[], members: string[]): Record<string, number> {
+export function calculateNetBalances(
+  expenses: Expense[],
+  members: string[]
+): Record<string, number> {
   const balances: Record<string, number> = {};
   for (const m of members) balances[m] = 0;
 
@@ -13,7 +16,10 @@ export function calculateNetBalances(expenses: Expense[], members: string[]): Re
   return balances;
 }
 
-export function simplifyDebts(expenses: Expense[], members: string[]): Balance[] {
+export function simplifyDebts(
+  expenses: Expense[],
+  members: string[]
+): Balance[] {
   const nets = calculateNetBalances(expenses, members);
 
   const creditors: { name: string; amount: number }[] = [];
@@ -38,7 +44,7 @@ export function simplifyDebts(expenses: Expense[], members: string[]): Balance[]
       settlements.push({
         from: debtors[di].name,
         to: creditors[ci].name,
-        amount: Math.round(amount * 100) / 100,
+        amount: Math.round(amount * 100) / 100
       });
     }
     creditors[ci].amount -= amount;
@@ -76,13 +82,18 @@ export function calculateSplits(
       break;
     }
     case 'percentage': {
-      for (const m of involved) shares[m] = (cost * (splitValues[m] ?? 0)) / 100;
+      for (const m of involved)
+        shares[m] = (cost * (splitValues[m] ?? 0)) / 100;
       break;
     }
     case 'shares': {
-      const totalShares = involved.reduce((sum, m) => sum + (splitValues[m] ?? 0), 0);
+      const totalShares = involved.reduce(
+        (sum, m) => sum + (splitValues[m] ?? 0),
+        0
+      );
       if (totalShares > 0) {
-        for (const m of involved) shares[m] = (cost * (splitValues[m] ?? 0)) / totalShares;
+        for (const m of involved)
+          shares[m] = (cost * (splitValues[m] ?? 0)) / totalShares;
       }
       break;
     }
@@ -97,7 +108,11 @@ export function calculateSplits(
   return splits;
 }
 
-export function getBalanceBetween(expenses: Expense[], person1: string, person2: string): number {
+export function getBalanceBetween(
+  expenses: Expense[],
+  person1: string,
+  person2: string
+): number {
   let balance = 0;
   for (const expense of expenses) {
     if (expense.paidBy === person1 && expense.splits[person2] !== undefined) {

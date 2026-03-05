@@ -1,7 +1,10 @@
 import type { Expense } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export function parseSplitwiseCSV(csvText: string): { members: string[]; expenses: Expense[] } {
+export function parseSplitwiseCSV(csvText: string): {
+  members: string[];
+  expenses: Expense[];
+} {
   const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return { members: [], expenses: [] };
 
@@ -9,12 +12,21 @@ export function parseSplitwiseCSV(csvText: string): { members: string[]; expense
 
   const memberStartIdx = headers.findIndex((h) => {
     const lower = h.toLowerCase().trim();
-    return lower !== 'date' && lower !== 'description' && lower !== 'category' && lower !== 'cost' && lower !== 'currency';
+    return (
+      lower !== 'date' &&
+      lower !== 'description' &&
+      lower !== 'category' &&
+      lower !== 'cost' &&
+      lower !== 'currency'
+    );
   });
 
   if (memberStartIdx < 0) return { members: [], expenses: [] };
 
-  const members = headers.slice(memberStartIdx).map((h) => h.trim()).filter(Boolean);
+  const members = headers
+    .slice(memberStartIdx)
+    .map((h) => h.trim())
+    .filter(Boolean);
   const expenses: Expense[] = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -51,7 +63,7 @@ export function parseSplitwiseCSV(csvText: string): { members: string[]; expense
       currency,
       paidBy,
       splitType: 'equal',
-      splits,
+      splits
     });
   }
 
@@ -59,7 +71,14 @@ export function parseSplitwiseCSV(csvText: string): { members: string[]; expense
 }
 
 export function exportToCSV(expenses: Expense[], members: string[]): string {
-  const headers = ['Date', 'Description', 'Category', 'Cost', 'Currency', ...members];
+  const headers = [
+    'Date',
+    'Description',
+    'Category',
+    'Cost',
+    'Currency',
+    ...members
+  ];
   const lines = [headers.map(escapeCSV).join(',')];
 
   for (const expense of expenses) {
@@ -69,7 +88,7 @@ export function exportToCSV(expenses: Expense[], members: string[]): string {
       expense.category,
       expense.cost.toFixed(2),
       expense.currency,
-      ...members.map((m) => (expense.splits[m] ?? 0).toFixed(2)),
+      ...members.map((m) => (expense.splits[m] ?? 0).toFixed(2))
     ];
     lines.push(row.map(escapeCSV).join(','));
   }
@@ -120,8 +139,10 @@ function normalizeDate(dateStr: string): string {
   const parts = cleaned.split('-');
   if (parts.length === 3) {
     const [a, b, c] = parts;
-    if (a.length === 4) return `${a}-${b.padStart(2, '0')}-${c.padStart(2, '0')}`;
-    if (c.length === 4) return `${c}-${a.padStart(2, '0')}-${b.padStart(2, '0')}`;
+    if (a.length === 4)
+      return `${a}-${b.padStart(2, '0')}-${c.padStart(2, '0')}`;
+    if (c.length === 4)
+      return `${c}-${a.padStart(2, '0')}-${b.padStart(2, '0')}`;
   }
   return cleaned;
 }
