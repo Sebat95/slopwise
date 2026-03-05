@@ -34,6 +34,7 @@ interface AppContextValue extends AppState {
   deleteExpense: (expenseId: string) => Promise<void>;
   addMember: (name: string) => Promise<void>;
   renameMember: (oldName: string, newName: string) => Promise<void>;
+  linkMemberToGoogle: (memberName: string) => Promise<void>;
   settleUp: (from: string, to: string, amount: number) => Promise<void>;
   renameSheet: (newName: string) => Promise<void>;
   importExpenses: (
@@ -291,6 +292,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [state.members, state.memberProfiles, loadData]
   );
 
+  const linkMemberToGoogle = useCallback(
+    async (memberName: string) => {
+      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+      if (!ssId) return;
+      const user = await fetchUserProfile();
+      if (!user) return;
+      const info: MemberInfo = { name: memberName, email: user.email, photoUrl: user.picture };
+      setState((s) => ({
+        ...s,
+        memberProfiles: { ...s.memberProfiles, [memberName]: info }
+      }));
+      sheetsApi.saveMemberProfile(ssId, info).catch(() => {});
+    },
+    []
+  );
+
   const settleUp = useCallback(
     async (from: string, to: string, amount: number) => {
       const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
@@ -419,6 +436,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteExpense,
         addMember,
         renameMember,
+        linkMemberToGoogle,
         settleUp,
         renameSheet,
         importExpenses,

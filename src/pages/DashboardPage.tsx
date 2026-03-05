@@ -9,7 +9,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
 import { calculateNetBalances, simplifyDebts } from '../utils/balance';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, parseAmount } from '../utils/format';
 import {
   PlusCircle,
   Receipt,
@@ -17,7 +17,6 @@ import {
   Pencil,
   Check,
   X,
-  ArrowRight,
   Handshake,
   ArrowLeftRight
 } from 'lucide-react';
@@ -70,9 +69,13 @@ export default function DashboardPage() {
     setEditing(false);
   };
 
+  const [visibleCount, setVisibleCount] = useState(10);
+
   const netBalances = calculateNetBalances(expenses, members);
   const debts = useMemo(() => simplifyDebts(expenses, members), [expenses, members]);
-  const recentExpenses = [...expenses].reverse().slice(0, 5);
+  const allRecent = useMemo(() => [...expenses].reverse(), [expenses]);
+  const recentExpenses = allRecent.slice(0, visibleCount);
+  const hasMore = visibleCount < allRecent.length;
 
   const getOwedAmount = (from: string, to: string): number => {
     const debt = debts.find((d) => d.from === from && d.to === to);
@@ -113,7 +116,7 @@ export default function DashboardPage() {
   };
 
   const handleSettle = async () => {
-    const amt = parseFloat(settleAmount);
+    const amt = parseAmount(settleAmount);
     if (!settleFrom || !settleTo || settleFrom === settleTo || !amt || amt <= 0)
       return;
     setSettling(true);
@@ -239,14 +242,14 @@ export default function DashboardPage() {
         <div className="mb-6 flex gap-2">
           <button
             onClick={() => navigate('/add')}
-            className="bg-primary hover:bg-primary-dark flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors"
+            className="bg-primary hover:bg-primary-dark flex h-12 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-white transition-colors"
           >
             <PlusCircle size={18} /> Add Expense
           </button>
           {members.length >= 2 && (
             <button
               onClick={() => openSettle()}
-              className="bg-bg-card border-border hover:border-primary/50 flex items-center gap-2 rounded-xl border px-4 py-3.5 text-sm font-semibold text-text-primary transition-colors"
+              className="bg-bg-card border-border hover:border-primary/50 flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold text-text-primary transition-colors"
             >
               <Handshake size={18} className="text-primary" /> Settle
             </button>
@@ -255,18 +258,10 @@ export default function DashboardPage() {
 
         {/* Recent Activity */}
         <div>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3">
             <h2 className="text-text-secondary text-sm font-semibold tracking-wide uppercase">
               Recent
             </h2>
-            {expenses.length > 5 && (
-              <button
-                onClick={() => navigate('/expenses')}
-                className="text-primary flex items-center gap-0.5 text-xs hover:underline"
-              >
-                View all <ArrowRight size={12} />
-              </button>
-            )}
           </div>
 
           {recentExpenses.length === 0 ? (
@@ -293,6 +288,14 @@ export default function DashboardPage() {
                   onDelete={handleDelete}
                 />
               ))}
+              {hasMore && (
+                <button
+                  onClick={() => setVisibleCount((c) => c + 10)}
+                  className="text-primary hover:bg-primary/10 w-full rounded-xl py-2.5 text-center text-sm font-medium transition-colors"
+                >
+                  Load more
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -352,12 +355,11 @@ export default function DashboardPage() {
               Amount
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={settleAmount}
               onChange={(e) => setSettleAmount(e.target.value)}
               placeholder="0.00"
-              step="0.01"
-              min="0"
               className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
             />
           </div>
@@ -369,7 +371,7 @@ export default function DashboardPage() {
               !settleFrom ||
               !settleTo ||
               settleFrom === settleTo ||
-              !parseFloat(settleAmount)
+              !parseAmount(settleAmount)
             }
             className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >

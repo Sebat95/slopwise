@@ -1,5 +1,12 @@
 import { format, parseISO, isValid } from 'date-fns';
 
+export function parseAmount(input: string): number {
+  const cleaned = input.replace(/,/g, '.');
+  const val = parseFloat(cleaned);
+  if (isNaN(val)) return 0;
+  return Math.round(val * 100) / 100;
+}
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$',
   EUR: '€',

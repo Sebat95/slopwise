@@ -5,7 +5,7 @@ import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import { CATEGORIES, CURRENCIES, type SplitType } from '../types';
 import { calculateSplits } from '../utils/balance';
-import { todayStr, formatCurrency, getCategoryEmoji } from '../utils/format';
+import { todayStr, formatCurrency, getCategoryEmoji, parseAmount } from '../utils/format';
 import {
   ChevronLeft,
   Check,
@@ -74,7 +74,7 @@ export default function AddExpensePage() {
     }
   }, [existing]);
 
-  const cost = parseFloat(amount) || 0;
+  const cost = parseAmount(amount);
 
   const toggleInvolved = (m: string) => {
     setInvolved((prev) => {
@@ -218,12 +218,11 @@ export default function AddExpensePage() {
                 <DollarSign size={12} /> Amount
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                step="0.01"
-                min="0"
                 className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
               />
             </div>

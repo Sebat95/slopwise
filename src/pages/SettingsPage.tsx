@@ -18,7 +18,8 @@ import {
   Unplug,
   Pencil,
   Check,
-  X
+  X,
+  Link
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -32,6 +33,7 @@ export default function SettingsPage() {
     expenses,
     addMember,
     renameMember,
+    linkMemberToGoogle,
     importExpenses,
     loadData,
     disconnect,
@@ -256,6 +258,19 @@ export default function SettingsPage() {
                       </p>
                     )}
                   </div>
+                  {!isEditing && (
+                    <button
+                      onClick={() => linkMemberToGoogle(m)}
+                      className={`shrink-0 rounded-lg p-1.5 text-xs transition-colors ${
+                        profile?.email
+                          ? 'text-positive hover:bg-positive/10'
+                          : 'text-text-muted hover:text-primary hover:bg-primary/10'
+                      }`}
+                      title={profile?.email ? `Linked to ${profile.email}` : 'Link your Google account'}
+                    >
+                      <Link size={14} />
+                    </button>
+                  )}
                 </div>
               );
             })}
