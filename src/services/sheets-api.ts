@@ -93,6 +93,24 @@ export async function createSpreadsheet(
               ]
             }
           ]
+        },
+        {
+          properties: { title: '_members', index: 2 },
+          data: [
+            {
+              startRow: 0,
+              startColumn: 0,
+              rowData: [
+                {
+                  values: [
+                    { userEnteredValue: { stringValue: 'Name' } },
+                    { userEnteredValue: { stringValue: 'Email' } },
+                    { userEnteredValue: { stringValue: 'PhotoURL' } }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       ]
     })
@@ -354,10 +372,7 @@ export async function readMemberProfiles(spreadsheetId: string): Promise<MemberI
     .map((r) => ({ name: r[0], email: r[1] || '', photoUrl: r[2] || '' }));
 }
 
-export async function saveMemberProfile(
-  spreadsheetId: string,
-  member: MemberInfo
-): Promise<void> {
+async function ensureMembersSheet(spreadsheetId: string): Promise<void> {
   const info = await getSpreadsheetInfo(spreadsheetId);
   if (!info.sheets.includes('_members')) {
     await apiRequest(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
@@ -371,24 +386,24 @@ export async function saveMemberProfile(
       { method: 'PUT', body: JSON.stringify({ values: [['Name', 'Email', 'PhotoURL']] }) }
     );
   }
+}
 
-  const existing = await readMemberProfiles(spreadsheetId);
-  const idx = existing.findIndex(
-    (m) => m.name === member.name || m.email === member.email
+export async function writeAllMemberProfiles(
+  spreadsheetId: string,
+  profiles: MemberInfo[]
+): Promise<void> {
+  await ensureMembersSheet(spreadsheetId);
+  const header = ['Name', 'Email', 'PhotoURL'];
+  const rows = [header, ...profiles.map((p) => [p.name, p.email, p.photoUrl])];
+  await apiRequest(
+    `${SHEETS_API}/${spreadsheetId}/values/_members!A1:C${rows.length}?valueInputOption=USER_ENTERED`,
+    { method: 'PUT', body: JSON.stringify({ values: rows }) }
   );
-
-  if (idx >= 0) {
-    const rowNum = idx + 2;
-    await apiRequest(
-      `${SHEETS_API}/${spreadsheetId}/values/_members!A${rowNum}:C${rowNum}?valueInputOption=USER_ENTERED`,
-      { method: 'PUT', body: JSON.stringify({ values: [[member.name, member.email, member.photoUrl]] }) }
-    );
-  } else {
-    await apiRequest(
-      `${SHEETS_API}/${spreadsheetId}/values/_members!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-      { method: 'POST', body: JSON.stringify({ values: [[member.name, member.email, member.photoUrl]] }) }
-    );
-  }
+  // Clear any leftover rows below
+  await apiRequest(
+    `${SHEETS_API}/${spreadsheetId}/values/_members!A${rows.length + 1}:C200:clear`,
+    { method: 'POST', body: JSON.stringify({}) }
+  ).catch(() => {});
 }
 
 export async function initializeSheetIfNeeded(
