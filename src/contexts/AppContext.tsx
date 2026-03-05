@@ -149,8 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...s,
           expenses: backup,
           isSyncing: false,
-          error:
-            err instanceof Error ? err.message : 'Failed to update expense'
+          error: err instanceof Error ? err.message : 'Failed to update expense'
         }));
       }
     },

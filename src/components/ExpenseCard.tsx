@@ -23,7 +23,7 @@ export default function ExpenseCard({
 
   return (
     <div
-      className="bg-bg-card border-border/50 hover:border-border group flex items-center gap-3 rounded-xl border p-3 transition-colors cursor-pointer"
+      className="bg-bg-card border-border/50 hover:border-border group flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors"
       onClick={() => onEdit?.(expense.id)}
     >
       <div className="bg-bg-surface flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg">
