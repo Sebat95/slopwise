@@ -7,16 +7,16 @@ import Avatar from '../components/Avatar';
 import SyncIndicator from '../components/SyncIndicator';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
-import { calculateNetBalances, simplifyDebts } from '../utils/balance';
+import { calculateNetBalances } from '../utils/balance';
 import { formatCurrency } from '../utils/format';
 import {
   PlusCircle,
-  ArrowRight,
   Receipt,
   RefreshCw,
   Pencil,
   Check,
-  X
+  X,
+  ArrowRight
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -61,7 +61,6 @@ export default function DashboardPage() {
   };
 
   const netBalances = calculateNetBalances(expenses, members);
-  const debts = simplifyDebts(expenses, members);
   const recentExpenses = [...expenses].reverse().slice(0, 5);
 
   const handleEdit = (id: string) => navigate(`/edit/${id}`);
@@ -169,45 +168,6 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        )}
-
-        {/* Outstanding Debts */}
-        {debts.length > 0 && (
-          <div className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-text-secondary text-sm font-semibold tracking-wide uppercase">
-                Outstanding
-              </h2>
-              <button
-                onClick={() => navigate('/balances')}
-                className="text-primary flex items-center gap-0.5 text-xs hover:underline"
-              >
-                View all <ArrowRight size={12} />
-              </button>
-            </div>
-            <div className="space-y-2">
-              {debts.slice(0, 3).map((d, i) => (
-                <div
-                  key={i}
-                  className="bg-bg-card border-border/50 flex items-center gap-3 rounded-xl border p-3"
-                >
-                  <Avatar name={d.from} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <span className="text-text-primary text-sm font-medium">
-                      {d.from}
-                    </span>
-                    <span className="text-text-muted mx-1.5 text-xs">owes</span>
-                    <span className="text-text-primary text-sm font-medium">
-                      {d.to}
-                    </span>
-                  </div>
-                  <span className="text-negative text-sm font-semibold">
-                    {formatCurrency(d.amount, currency)}
-                  </span>
-                </div>
-              ))}
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
@@ -12,7 +12,8 @@ import {
   ArrowRight,
   Handshake,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  CalendarRange
 } from 'lucide-react';
 
 export default function BalancesPage() {
@@ -23,8 +24,43 @@ export default function BalancesPage() {
   const [settleAmount, setSettleAmount] = useState('');
   const [settling, setSettling] = useState(false);
 
-  const netBalances = calculateNetBalances(expenses, members);
-  const debts = simplifyDebts(expenses, members);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const filteredExpenses = useMemo(() => {
+    if (!dateFrom && !dateTo) return expenses;
+    return expenses.filter((e) => {
+      if (dateFrom && e.date < dateFrom) return false;
+      if (dateTo && e.date > dateTo) return false;
+      return true;
+    });
+  }, [expenses, dateFrom, dateTo]);
+
+  const totalExpenses = useMemo(
+    () =>
+      filteredExpenses
+        .filter((e) => e.category !== 'Payment')
+        .reduce((sum, e) => sum + e.cost, 0),
+    [filteredExpenses]
+  );
+
+  const perPersonSpending = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const m of members) totals[m] = 0;
+    for (const exp of filteredExpenses) {
+      if (exp.category === 'Payment') continue;
+      for (const m of members) {
+        const net = exp.splits[m] ?? 0;
+        const paid = m === exp.paidBy ? exp.cost : 0;
+        const share = paid - net;
+        totals[m] += share;
+      }
+    }
+    return totals;
+  }, [filteredExpenses, members]);
+
+  const netBalances = calculateNetBalances(filteredExpenses, members);
+  const debts = simplifyDebts(filteredExpenses, members);
 
   const openSettle = (from?: string, to?: string, amount?: number) => {
     setSettleFrom(from || members[0] || '');
@@ -52,6 +88,8 @@ export default function BalancesPage() {
     (a, b) => (netBalances[b] || 0) - (netBalances[a] || 0)
   );
 
+  const hasDateFilter = !!dateFrom || !!dateTo;
+
   return (
     <Layout>
       <div className="mx-auto max-w-lg px-4 py-4">
@@ -65,6 +103,61 @@ export default function BalancesPage() {
           </button>
         </div>
 
+        {/* Date Range Filter */}
+        <div className="bg-bg-card border-border/50 mb-6 rounded-2xl border p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <CalendarRange size={14} className="text-text-muted" />
+            <span className="text-text-muted text-xs font-semibold tracking-wide uppercase">
+              Date Range
+            </span>
+            {hasDateFilter && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                className="text-primary ml-auto text-xs hover:underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="bg-bg-input border-border text-text-primary focus:border-primary flex-1 rounded-lg border px-3 py-2 text-xs focus:outline-none"
+              placeholder="From"
+            />
+            <span className="text-text-muted text-xs">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="bg-bg-input border-border text-text-primary focus:border-primary flex-1 rounded-lg border px-3 py-2 text-xs focus:outline-none"
+              placeholder="To"
+            />
+          </div>
+
+          {/* Total */}
+          <div className="border-border/30 mt-4 border-t pt-3">
+            <div className="text-text-muted text-[10px] tracking-wide uppercase">
+              Total Expenses{hasDateFilter ? ' (filtered)' : ''}
+            </div>
+            <div className="text-text-primary text-2xl font-bold">
+              {formatCurrency(totalExpenses, currency)}
+            </div>
+            {members.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {members.map((m) => (
+                  <div key={m} className="text-text-secondary text-xs">
+                    <span className="text-text-muted">{m}:</span>{' '}
+                    {formatCurrency(perPersonSpending[m] || 0, currency)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {members.length === 0 ? (
           <EmptyState
             icon={<Scale size={40} />}
@@ -74,10 +167,10 @@ export default function BalancesPage() {
         ) : (
           <>
             {/* Spending Over Time Chart */}
-            {expenses.length >= 2 && (
+            {filteredExpenses.length >= 2 && (
               <div className="mb-6">
                 <SpendingChart
-                  expenses={expenses}
+                  expenses={filteredExpenses}
                   members={members}
                   currency={currency}
                 />
