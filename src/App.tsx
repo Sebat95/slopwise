@@ -90,7 +90,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/balances"
+        path="/stats"
         element={
           <AuthGuard>
             <SheetGuard>

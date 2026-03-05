@@ -9,6 +9,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 interface Props {
   expense: Expense;
   currentUser?: string;
+  showDate?: boolean;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
 }
@@ -16,6 +17,7 @@ interface Props {
 export default function ExpenseCard({
   expense,
   currentUser,
+  showDate = true,
   onEdit,
   onDelete
 }: Props) {
@@ -41,7 +43,7 @@ export default function ExpenseCard({
           )}
         </div>
         <div className="text-text-muted mt-0.5 text-xs">
-          {formatDateShort(expense.date)} · {expense.paidBy} paid
+          {showDate ? `${formatDateShort(expense.date)} · ` : ''}{expense.paidBy} paid
         </div>
       </div>
       <div className="shrink-0 text-right">

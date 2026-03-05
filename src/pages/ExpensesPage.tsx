@@ -6,11 +6,11 @@ import ExpenseCard from '../components/ExpenseCard';
 import EmptyState from '../components/EmptyState';
 import { Search, Receipt, PlusCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { getCategoryEmoji } from '../utils/format';
+import { getCategoryEmoji, formatCurrency } from '../utils/format';
 
 export default function ExpensesPage() {
   const navigate = useNavigate();
-  const { expenses, deleteExpense } = useApp();
+  const { expenses, currency, deleteExpense } = useApp();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -42,6 +42,11 @@ export default function ExpensesPage() {
     }
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
   }, [filtered]);
+
+  const filteredTotal = useMemo(
+    () => filtered.filter((e) => e.category !== 'Payment').reduce((sum, e) => sum + e.cost, 0),
+    [filtered]
+  );
 
   const handleEdit = (id: string) => navigate(`/edit/${id}`);
   const handleDelete = (id: string) => {
@@ -89,6 +94,19 @@ export default function ExpensesPage() {
           </select>
         </div>
 
+        {/* Running total */}
+        {filtered.length > 0 && (
+          <div className="bg-bg-card border-border/50 mb-4 flex items-center justify-between rounded-xl border px-4 py-2.5">
+            <span className="text-text-muted text-xs">
+              {filtered.length} expense{filtered.length !== 1 ? 's' : ''}
+              {(search || categoryFilter !== 'all') ? ' (filtered)' : ''}
+            </span>
+            <span className="text-text-primary text-sm font-bold">
+              {formatCurrency(filteredTotal, currency)}
+            </span>
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <EmptyState
             icon={<Receipt size={40} />}
@@ -125,6 +143,7 @@ export default function ExpensesPage() {
                     <ExpenseCard
                       key={e.id}
                       expense={e}
+                      showDate={false}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                     />

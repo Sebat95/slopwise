@@ -26,7 +26,7 @@ export default function SpendingChart({
   members,
   dateFrom,
   dateTo,
-  onRangeChange
+  onRangeChange,
 }: Props) {
   const allData = useMemo(() => {
     const nonPayments = expenses
@@ -61,10 +61,7 @@ export default function SpendingChart({
     }
     if (dateTo) {
       for (let i = allData.length - 1; i >= 0; i--) {
-        if (allData[i].date <= dateTo) {
-          e = i;
-          break;
-        }
+        if (allData[i].date <= dateTo) { e = i; break; }
       }
     }
     if (s > e) s = e;
@@ -82,9 +79,7 @@ export default function SpendingChart({
       const rect = containerRef.current.getBoundingClientRect();
       const relX = clientX - rect.left;
       const pct = (relX - PAD_L) / CHART_W;
-      return Math.round(
-        Math.max(0, Math.min(allData.length - 1, pct * (allData.length - 1)))
-      );
+      return Math.round(Math.max(0, Math.min(allData.length - 1, pct * (allData.length - 1))));
     },
     [allData]
   );
@@ -104,11 +99,7 @@ export default function SpendingChart({
       e.preventDefault();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       dragMode.current = mode;
-      dragOrigin.current = {
-        x: e.clientX,
-        startIdx: rangeStart,
-        endIdx: rangeEnd
-      };
+      dragOrigin.current = { x: e.clientX, startIdx: rangeStart, endIdx: rangeEnd };
     },
     [rangeStart, rangeEnd]
   );
@@ -130,14 +121,8 @@ export default function SpendingChart({
         let s = origin.startIdx + delta;
         let end = origin.endIdx + delta;
         const span = end - s;
-        if (s < 0) {
-          s = 0;
-          end = span;
-        }
-        if (end > allData.length - 1) {
-          end = allData.length - 1;
-          s = end - span;
-        }
+        if (s < 0) { s = 0; end = span; }
+        if (end > allData.length - 1) { end = allData.length - 1; s = end - span; }
         commitRange(Math.max(0, s), Math.min(allData.length - 1, end));
       }
     },
@@ -162,12 +147,13 @@ export default function SpendingChart({
   maxVal = Math.ceil(maxVal * 1.1) || 1;
 
   const xScale = (i: number) =>
-    PAD_L +
-    (visible.length > 1 ? (i / (visible.length - 1)) * CHART_W : CHART_W / 2);
-  const yScale = (v: number) => PAD_T + CHART_H - (v / maxVal) * CHART_H;
+    PAD_L + (visible.length > 1 ? (i / (visible.length - 1)) * CHART_W : CHART_W / 2);
+  const yScale = (v: number) =>
+    PAD_T + CHART_H - (v / maxVal) * CHART_H;
 
   // Brush positions (full data range)
-  const brushX = (i: number) => PAD_L + (i / (allData.length - 1)) * CHART_W;
+  const brushX = (i: number) =>
+    PAD_L + (i / (allData.length - 1)) * CHART_W;
   const leftX = brushX(rangeStart);
   const rightX = brushX(rangeEnd);
 
@@ -179,8 +165,7 @@ export default function SpendingChart({
     }
   }
   brushMax = brushMax || 1;
-  const brushYScale = (v: number) =>
-    BRUSH_H - 4 - (v / brushMax) * (BRUSH_H - 8);
+  const brushYScale = (v: number) => BRUSH_H - 4 - ((v / brushMax) * (BRUSH_H - 8));
 
   const gridLines = 4;
   const yTicks = Array.from({ length: gridLines + 1 }, (_, i) =>
@@ -203,19 +188,13 @@ export default function SpendingChart({
         {yTicks.map((tick) => (
           <g key={tick}>
             <line
-              x1={PAD_L}
-              x2={W - PAD_R}
-              y1={yScale(tick)}
-              y2={yScale(tick)}
-              stroke="var(--color-border)"
-              strokeWidth={0.5}
+              x1={PAD_L} x2={W - PAD_R}
+              y1={yScale(tick)} y2={yScale(tick)}
+              stroke="var(--color-border)" strokeWidth={0.5}
             />
             <text
-              x={PAD_L - 6}
-              y={yScale(tick) + 4}
-              textAnchor="end"
-              className="fill-text-muted"
-              fontSize={10}
+              x={PAD_L - 6} y={yScale(tick) + 4}
+              textAnchor="end" className="fill-text-muted" fontSize={10}
             >
               {tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick}
             </text>
@@ -226,20 +205,9 @@ export default function SpendingChart({
           const pt = visible[idx];
           if (!pt) return null;
           let label: string;
-          try {
-            label = format(parseISO(pt.date), 'MMM d');
-          } catch {
-            label = pt.date;
-          }
+          try { label = format(parseISO(pt.date), "MMM d ''yy"); } catch { label = pt.date; }
           return (
-            <text
-              key={idx}
-              x={xScale(idx)}
-              y={H - 4}
-              textAnchor="middle"
-              className="fill-text-muted"
-              fontSize={10}
-            >
+            <text key={idx} x={xScale(idx)} y={H - 4} textAnchor="middle" className="fill-text-muted" fontSize={10}>
               {label}
             </text>
           );
@@ -248,27 +216,12 @@ export default function SpendingChart({
         {members.map((m) => {
           const color = getAvatarColor(m);
           const pathD = visible
-            .map(
-              (pt, i) =>
-                `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(pt.totals[m] || 0).toFixed(1)}`
-            )
+            .map((pt, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(pt.totals[m] || 0).toFixed(1)}`)
             .join(' ');
           return (
             <g key={m}>
-              <path
-                d={pathD}
-                fill="none"
-                stroke={color}
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle
-                cx={xScale(visible.length - 1)}
-                cy={yScale(visible[visible.length - 1].totals[m] || 0)}
-                r={3.5}
-                fill={color}
-              />
+              <path d={pathD} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx={xScale(visible.length - 1)} cy={yScale(visible[visible.length - 1].totals[m] || 0)} r={3.5} fill={color} />
             </g>
           );
         })}
@@ -277,74 +230,32 @@ export default function SpendingChart({
       {/* Brush range selector */}
       <div
         ref={containerRef}
-        className="relative touch-none select-none"
+        className="relative select-none touch-none"
         style={{ height: BRUSH_H }}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
       >
         {/* Mini overview chart */}
-        <svg
-          viewBox={`0 0 ${W} ${BRUSH_H}`}
-          className="absolute inset-0 h-full w-full"
-        >
-          <rect
-            x={PAD_L}
-            y={0}
-            width={CHART_W}
-            height={BRUSH_H}
-            fill="var(--color-bg-surface)"
-            rx={4}
-          />
+        <svg viewBox={`0 0 ${W} ${BRUSH_H}`} className="absolute inset-0 w-full h-full">
+          <rect x={PAD_L} y={0} width={CHART_W} height={BRUSH_H} fill="var(--color-bg-surface)" rx={4} />
           {members.map((m) => {
             const color = getAvatarColor(m);
             const d = allData
-              .map(
-                (pt, i) =>
-                  `${i === 0 ? 'M' : 'L'}${brushX(i).toFixed(1)},${brushYScale(pt.totals[m] || 0).toFixed(1)}`
-              )
+              .map((pt, i) => `${i === 0 ? 'M' : 'L'}${brushX(i).toFixed(1)},${brushYScale(pt.totals[m] || 0).toFixed(1)}`)
               .join(' ');
-            return (
-              <path
-                key={m}
-                d={d}
-                fill="none"
-                stroke={color}
-                strokeWidth={1}
-                opacity={0.5}
-              />
-            );
+            return <path key={m} d={d} fill="none" stroke={color} strokeWidth={1} opacity={0.5} />;
           })}
 
           {/* Dimmed regions outside selection */}
-          <rect
-            x={PAD_L}
-            y={0}
-            width={Math.max(0, leftX - PAD_L)}
-            height={BRUSH_H}
-            fill="var(--color-bg-dark)"
-            opacity={0.5}
-            rx={4}
-          />
-          <rect
-            x={rightX}
-            y={0}
-            width={Math.max(0, PAD_L + CHART_W - rightX)}
-            height={BRUSH_H}
-            fill="var(--color-bg-dark)"
-            opacity={0.5}
-            rx={4}
-          />
+          <rect x={PAD_L} y={0} width={Math.max(0, leftX - PAD_L)} height={BRUSH_H} fill="var(--color-bg-dark)" opacity={0.5} rx={4} />
+          <rect x={rightX} y={0} width={Math.max(0, PAD_L + CHART_W - rightX)} height={BRUSH_H} fill="var(--color-bg-dark)" opacity={0.5} rx={4} />
         </svg>
 
         {/* Draggable selection window */}
         <div
           className="absolute top-0 cursor-grab active:cursor-grabbing"
-          style={{
-            left: `${(leftX / W) * 100}%`,
-            width: `${((rightX - leftX) / W) * 100}%`,
-            height: BRUSH_H
-          }}
+          style={{ left: `${(leftX / W) * 100}%`, width: `${((rightX - leftX) / W) * 100}%`, height: BRUSH_H }}
           onPointerDown={(e) => onPointerDown(e, 'middle')}
         >
           <div className="border-primary/60 h-full border-t-2 border-b-2" />
@@ -353,12 +264,7 @@ export default function SpendingChart({
         {/* Left handle */}
         <div
           className="absolute top-0 cursor-col-resize"
-          style={{
-            left: `${(leftX / W) * 100}%`,
-            width: 16,
-            height: BRUSH_H,
-            transform: 'translateX(-8px)'
-          }}
+          style={{ left: `${(leftX / W) * 100}%`, width: 16, height: BRUSH_H, transform: 'translateX(-8px)' }}
           onPointerDown={(e) => onPointerDown(e, 'left')}
         >
           <div className="bg-primary mx-auto mt-1.5 h-[calc(100%-12px)] w-1 rounded-full" />
@@ -367,12 +273,7 @@ export default function SpendingChart({
         {/* Right handle */}
         <div
           className="absolute top-0 cursor-col-resize"
-          style={{
-            left: `${(rightX / W) * 100}%`,
-            width: 16,
-            height: BRUSH_H,
-            transform: 'translateX(-8px)'
-          }}
+          style={{ left: `${(rightX / W) * 100}%`, width: 16, height: BRUSH_H, transform: 'translateX(-8px)' }}
           onPointerDown={(e) => onPointerDown(e, 'right')}
         >
           <div className="bg-primary mx-auto mt-1.5 h-[calc(100%-12px)] w-1 rounded-full" />
@@ -383,10 +284,7 @@ export default function SpendingChart({
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
         {members.map((m) => (
           <div key={m} className="flex items-center gap-1.5">
-            <div
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: getAvatarColor(m) }}
-            />
+            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getAvatarColor(m) }} />
             <span className="text-text-secondary text-xs">{m}</span>
           </div>
         ))}

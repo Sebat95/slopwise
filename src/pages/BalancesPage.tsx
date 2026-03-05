@@ -111,7 +111,7 @@ export default function BalancesPage() {
     <Layout>
       <div className="mx-auto max-w-lg px-4 py-4">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-text-primary text-xl font-bold">Balances</h1>
+          <h1 className="text-text-primary text-xl font-bold">Stats</h1>
           <button
             onClick={() => openSettle()}
             className="bg-primary hover:bg-primary-dark flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-colors"
@@ -291,6 +291,33 @@ export default function BalancesPage() {
           </>
         )}
       </div>
+
+      {/* Quick Stats */}
+      {members.length > 0 && (
+        <div className="mx-auto max-w-lg px-4 pb-4">
+          <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
+            Overview
+          </h2>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
+              <p className="text-text-primary text-lg font-bold">
+                {expenses.length}
+              </p>
+              <p className="text-text-muted text-[10px]">Expenses</p>
+            </div>
+            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
+              <p className="text-text-primary text-lg font-bold">
+                {members.length}
+              </p>
+              <p className="text-text-muted text-[10px]">Members</p>
+            </div>
+            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
+              <p className="text-text-primary text-lg font-bold">{currency}</p>
+              <p className="text-text-muted text-[10px]">Currency</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Settle Up Modal */}
       <Modal

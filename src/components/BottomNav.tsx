@@ -1,11 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Plus, Scale, Settings } from 'lucide-react';
+import { LayoutDashboard, Receipt, Plus, BarChart3, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { path: '/expenses', label: 'Expenses', icon: Receipt },
   { path: '/add', label: 'Add', icon: Plus },
-  { path: '/balances', label: 'Balances', icon: Scale },
+  { path: '/stats', label: 'Stats', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings }
 ];
 

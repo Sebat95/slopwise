@@ -26,7 +26,6 @@ export default function SettingsPage() {
     spreadsheetName,
     members,
     expenses,
-    currency,
     addMember,
     importExpenses,
     loadData,
@@ -230,31 +229,6 @@ export default function SettingsPage() {
                 </p>
               </div>
             </button>
-          </div>
-        </section>
-
-        {/* Stats */}
-        <section className="mb-6">
-          <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
-            Stats
-          </h2>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
-              <p className="text-text-primary text-lg font-bold">
-                {expenses.length}
-              </p>
-              <p className="text-text-muted text-[10px]">Expenses</p>
-            </div>
-            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
-              <p className="text-text-primary text-lg font-bold">
-                {members.length}
-              </p>
-              <p className="text-text-muted text-[10px]">Members</p>
-            </div>
-            <div className="bg-bg-card border-border/50 rounded-xl border p-3 text-center">
-              <p className="text-text-primary text-lg font-bold">{currency}</p>
-              <p className="text-text-muted text-[10px]">Currency</p>
-            </div>
           </div>
         </section>
 
