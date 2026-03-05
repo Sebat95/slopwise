@@ -50,26 +50,58 @@ export interface GoogleTokenInfo {
 }
 
 export const CATEGORIES = [
+  // Uncategorized / General
   'General',
-  'Food & Drink',
-  'Groceries',
-  'Transportation',
-  'Rent',
-  'Utilities',
-  'Entertainment',
-  'Shopping',
-  'Healthcare',
-  'Travel',
-  'Education',
+  // Entertainment
+  'Entertainment - Other',
+  'Games',
+  'Movies',
+  'Music',
   'Sports',
-  'Clothing',
-  'Gifts',
-  'Home',
+  // Food and drink
+  'Food and drink - Other',
+  'Dining out',
+  'Groceries',
+  'Liquor',
+  // Home
+  'Home - Other',
   'Electronics',
+  'Furniture',
+  'Household supplies',
+  'Maintenance',
+  'Mortgage',
+  'Pets',
+  'Rent',
+  'Services',
+  // Life
+  'Life - Other',
+  'Childcare',
+  'Clothing',
+  'Education',
+  'Gifts',
   'Insurance',
+  'Medical expenses',
   'Taxes',
+  // Transportation
+  'Transportation - Other',
+  'Bicycle',
+  'Bus/train',
+  'Car',
+  'Gas/fuel',
+  'Hotel',
+  'Parking',
+  'Plane',
+  'Taxi',
+  // Utilities
+  'Utilities - Other',
+  'Cleaning',
+  'Electricity',
+  'Heat/gas',
+  'TV/Phone/Internet',
+  'Trash',
+  'Water',
+  // Special
   'Payment',
-  'Other'
 ] as const;
 
 export const CURRENCIES = [

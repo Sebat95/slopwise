@@ -76,28 +76,74 @@ export function getAvatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+const CATEGORY_EMOJI: Record<string, string> = {
+  // General
+  'General': '📋',
+  // Entertainment
+  'Entertainment - Other': '🎭',
+  'Games': '🎮',
+  'Movies': '🎬',
+  'Music': '🎵',
+  'Sports': '⚽',
+  // Food and drink
+  'Food and drink - Other': '🍽️',
+  'Dining out': '🍕',
+  'Groceries': '🛒',
+  'Liquor': '🍷',
+  // Home
+  'Home - Other': '🏡',
+  'Electronics': '📱',
+  'Furniture': '🪑',
+  'Household supplies': '🧹',
+  'Maintenance': '🔧',
+  'Mortgage': '🏦',
+  'Pets': '🐾',
+  'Rent': '🏠',
+  'Services': '🛠️',
+  // Life
+  'Life - Other': '🌿',
+  'Childcare': '👶',
+  'Clothing': '👕',
+  'Education': '📚',
+  'Gifts': '🎁',
+  'Insurance': '🛡️',
+  'Medical expenses': '🏥',
+  'Taxes': '💰',
+  // Transportation
+  'Transportation - Other': '🚗',
+  'Bicycle': '🚲',
+  'Bus/train': '🚌',
+  'Car': '🚙',
+  'Gas/fuel': '⛽',
+  'Hotel': '🏨',
+  'Parking': '🅿️',
+  'Plane': '✈️',
+  'Taxi': '🚕',
+  // Utilities
+  'Utilities - Other': '💡',
+  'Cleaning': '🧽',
+  'Electricity': '⚡',
+  'Heat/gas': '🔥',
+  'TV/Phone/Internet': '📡',
+  'Trash': '🗑️',
+  'Water': '💧',
+  // Special
+  'Payment': '💸',
+
+  // Legacy aliases (old app categories → closest match)
+  'Entertainment': '🎭',
+  'Food & Drink': '🍽️',
+  'Food and drink': '🍽️',
+  'Home': '🏡',
+  'Life': '🌿',
+  'Transportation': '🚗',
+  'Utilities': '💡',
+  'Shopping': '🛍️',
+  'Healthcare': '🏥',
+  'Travel': '✈️',
+  'Other': '📦',
+};
+
 export function getCategoryEmoji(category: string): string {
-  const map: Record<string, string> = {
-    General: '📋',
-    'Food & Drink': '🍔',
-    Groceries: '🛒',
-    Transportation: '🚗',
-    Rent: '🏠',
-    Utilities: '💡',
-    Entertainment: '🎬',
-    Shopping: '🛍️',
-    Healthcare: '🏥',
-    Travel: '✈️',
-    Education: '📚',
-    Sports: '⚽',
-    Clothing: '👕',
-    Gifts: '🎁',
-    Home: '🏡',
-    Electronics: '📱',
-    Insurance: '🛡️',
-    Taxes: '💰',
-    Payment: '💸',
-    Other: '📦'
-  };
-  return map[category] || '📋';
+  return CATEGORY_EMOJI[category] || '📋';
 }
