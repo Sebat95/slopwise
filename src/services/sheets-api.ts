@@ -85,14 +85,16 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     apiRequest<{ values?: string[][] }>(`${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B10`).catch(() => ({ values: undefined })),
   ]);
 
-  let currency = 'USD';
+  let currency = 'EUR';
   if (settingsData.values) {
-    const currRow = settingsData.values.find((r) => r[0] === 'currency');
+    const currRow = settingsData.values.find((r) => r[0].toLowerCase() === 'currency');
     if (currRow?.[1]) currency = currRow[1];
   }
 
-  if (!expenseData.values || expenseData.values.length === 0) {
+  if (!expenseData.values || expenseData.values.length <= 1) {
     return { members: [], expenses: [], currency };
+  } else {
+    currency = expenseData.values[1][4];
   }
 
   const headers = expenseData.values[0];
@@ -132,7 +134,6 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       notes: '',
     });
   }
-
   return { members: memberNames, expenses, currency };
 }
 

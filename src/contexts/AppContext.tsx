@@ -34,7 +34,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     spreadsheetName: sessionStorage.getItem('splitsheet_spreadsheet_name'),
     members: [],
     expenses: [],
-    currency: 'USD',
+    currency: 'EUR',
     isLoading: false,
     isSyncing: false,
     error: null,

@@ -13,7 +13,7 @@ type View = 'list' | 'create' | 'import';
 
 export default function SheetPickerPage() {
   const navigate = useNavigate();
-  const { selectSpreadsheet, loadData, importExpenses } = useApp();
+  const { selectSpreadsheet, loadData, importExpenses, currency } = useApp();
   const [view, setView] = useState<View>('list');
   const [sheets, setSheets] = useState<SpreadsheetInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +68,7 @@ export default function SheetPickerPage() {
     setCreating(true);
     setError(null);
     try {
-      const id = await createSpreadsheet(newName.trim(), members, newCurrency);
+      const id = await createSpreadsheet(newName.trim(), members, currency);
       selectSpreadsheet(id, newName.trim());
       await loadData();
       navigate('/dashboard');
@@ -93,7 +93,7 @@ export default function SheetPickerPage() {
       }
 
       const name = importFile.name.replace(/\.csv$/i, '') || 'Imported Expenses';
-      const id = await createSpreadsheet(name, members, 'USD');
+      const id = await createSpreadsheet(name, members, currency);
       selectSpreadsheet(id, name);
       await importExpenses(expenses, members);
       await loadData();
