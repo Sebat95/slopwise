@@ -281,7 +281,6 @@ export default function BalancesPage() {
           </div>
         </div>
       )}
-
     </Layout>
   );
 }

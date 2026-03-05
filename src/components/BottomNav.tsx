@@ -1,5 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Plus, BarChart3, Settings } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Receipt,
+  Plus,
+  BarChart3,
+  Settings
+} from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Home', icon: LayoutDashboard },

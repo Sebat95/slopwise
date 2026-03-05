@@ -4,7 +4,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.metadata.readonly',
   'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.email'
 ].join(' ');
 
 const SESSION_KEY = 'splitsheet_token';
@@ -121,7 +121,11 @@ export async function refreshToken(clientId: string): Promise<GoogleTokenInfo> {
   return signIn(clientId);
 }
 
-export async function fetchUserProfile(): Promise<{ name: string; email: string; picture: string } | null> {
+export async function fetchUserProfile(): Promise<{
+  name: string;
+  email: string;
+  picture: string;
+} | null> {
   const token = getAccessToken();
   if (!token) return null;
   try {
@@ -130,7 +134,11 @@ export async function fetchUserProfile(): Promise<{ name: string; email: string;
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return { name: data.name || '', email: data.email || '', picture: data.picture || '' };
+    return {
+      name: data.name || '',
+      email: data.email || '',
+      picture: data.picture || ''
+    };
   } catch {
     return null;
   }

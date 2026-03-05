@@ -72,7 +72,10 @@ export default function DashboardPage() {
   const [visibleCount, setVisibleCount] = useState(10);
 
   const netBalances = calculateNetBalances(expenses, members);
-  const debts = useMemo(() => simplifyDebts(expenses, members), [expenses, members]);
+  const debts = useMemo(
+    () => simplifyDebts(expenses, members),
+    [expenses, members]
+  );
   const allRecent = useMemo(() => [...expenses].reverse(), [expenses]);
   const recentExpenses = allRecent.slice(0, visibleCount);
   const hasMore = visibleCount < allRecent.length;
@@ -103,7 +106,8 @@ export default function DashboardPage() {
 
   const handleSettleFromChange = (val: string) => {
     setSettleFrom(val);
-    const to = val === settleTo ? members.find((m) => m !== val) || '' : settleTo;
+    const to =
+      val === settleTo ? members.find((m) => m !== val) || '' : settleTo;
     setSettleTo(to);
     const amt = getOwedAmount(val, to);
     setSettleAmount(amt > 0 ? amt.toFixed(2) : '');
@@ -249,7 +253,7 @@ export default function DashboardPage() {
           {members.length >= 2 && (
             <button
               onClick={() => openSettle()}
-              className="bg-bg-card border-border hover:border-primary/50 flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold text-text-primary transition-colors"
+              className="bg-bg-card border-border hover:border-primary/50 text-text-primary flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors"
             >
               <Handshake size={18} className="text-primary" /> Settle
             </button>
@@ -318,7 +322,9 @@ export default function DashboardPage() {
               className="bg-bg-input border-border text-text-primary focus:border-primary w-full appearance-none rounded-xl border px-4 py-3 text-sm focus:outline-none"
             >
               {members.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </div>
@@ -345,7 +351,9 @@ export default function DashboardPage() {
               {members
                 .filter((m) => m !== settleFrom)
                 .map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
                 ))}
             </select>
           </div>

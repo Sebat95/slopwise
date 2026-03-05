@@ -80,7 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const [data, profiles] = await Promise.all([
         sheetsApi.readSheetData(ssId),
-        sheetsApi.readMemberProfiles(ssId).catch(() => [] as MemberInfo[]),
+        sheetsApi.readMemberProfiles(ssId).catch(() => [] as MemberInfo[])
       ]);
 
       const profileMap: Record<string, MemberInfo> = {};
@@ -214,14 +214,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         await sheetsApi.addMemberColumn(ssId, state.members, name);
         const newProfiles = [
-          ...state.members.map((m) => state.memberProfiles[m] || { name: m, email: '', photoUrl: '' }),
+          ...state.members.map(
+            (m) =>
+              state.memberProfiles[m] || { name: m, email: '', photoUrl: '' }
+          ),
           { name, email: '', photoUrl: '' }
         ];
-        await sheetsApi.writeAllMemberProfiles(ssId, newProfiles).catch(() => {});
+        await sheetsApi
+          .writeAllMemberProfiles(ssId, newProfiles)
+          .catch(() => {});
         setState((s) => ({
           ...s,
           members: [...s.members, name],
-          memberProfiles: { ...s.memberProfiles, [name]: { name, email: '', photoUrl: '' } },
+          memberProfiles: {
+            ...s.memberProfiles,
+            [name]: { name, email: '', photoUrl: '' }
+          },
           isSyncing: false
         }));
       } catch (err) {
@@ -269,17 +277,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
 
       try {
-        await sheetsApi.renameMemberColumn(ssId, state.members, oldName, trimmed);
+        await sheetsApi.renameMemberColumn(
+          ssId,
+          state.members,
+          oldName,
+          trimmed
+        );
         // Rewrite all profiles with the updated name
         const updatedProfiles: MemberInfo[] = state.members.map((m) => {
           if (m === oldName) {
             const p = state.memberProfiles[oldName];
-            return { name: trimmed, email: p?.email || '', photoUrl: p?.photoUrl || '' };
+            return {
+              name: trimmed,
+              email: p?.email || '',
+              photoUrl: p?.photoUrl || ''
+            };
           }
           const p = state.memberProfiles[m];
           return p || { name: m, email: '', photoUrl: '' };
         });
-        await sheetsApi.writeAllMemberProfiles(ssId, updatedProfiles).catch(() => {});
+        await sheetsApi
+          .writeAllMemberProfiles(ssId, updatedProfiles)
+          .catch(() => {});
         setState((s) => ({ ...s, isSyncing: false }));
       } catch (err) {
         await loadData();
@@ -293,57 +312,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [state.members, state.memberProfiles, loadData]
   );
 
-  const linkMemberToGoogle = useCallback(
-    async (memberName: string) => {
-      const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
-      if (!ssId) return;
+  const linkMemberToGoogle = useCallback(async (memberName: string) => {
+    const ssId = sessionStorage.getItem('splitsheet_spreadsheet_id');
+    if (!ssId) return;
 
-      setState((s) => ({ ...s, isSyncing: true }));
+    setState((s) => ({ ...s, isSyncing: true }));
 
-      try {
-        const user = await fetchUserProfile();
-        if (!user) {
-          setState((s) => ({ ...s, isSyncing: false, error: 'Could not fetch Google profile. Try signing out and back in.' }));
-          return;
-        }
-
-        const newInfo: MemberInfo = { name: memberName, email: user.email, photoUrl: user.picture };
-
-        setState((s) => {
-          const updated = { ...s.memberProfiles };
-          // Unlink any member that previously had this email
-          for (const key of Object.keys(updated)) {
-            if (updated[key].email === user.email && key !== memberName) {
-              updated[key] = { ...updated[key], email: '', photoUrl: '' };
-            }
-          }
-          updated[memberName] = newInfo;
-          return { ...s, memberProfiles: updated };
-        });
-
-        // Build full profile list from current state and write all at once
-        setState((s) => {
-          const allProfiles: MemberInfo[] = s.members.map((m) => {
-            if (m === memberName) return newInfo;
-            const existing = s.memberProfiles[m];
-            if (existing && existing.email === user.email) {
-              return { name: m, email: '', photoUrl: '' };
-            }
-            return existing || { name: m, email: '', photoUrl: '' };
-          });
-          sheetsApi.writeAllMemberProfiles(ssId, allProfiles).then(() => {
-            setState((prev) => ({ ...prev, isSyncing: false }));
-          }).catch(() => {
-            setState((prev) => ({ ...prev, isSyncing: false }));
-          });
-          return s;
-        });
-      } catch {
-        setState((s) => ({ ...s, isSyncing: false, error: 'Failed to link profile' }));
+    try {
+      const user = await fetchUserProfile();
+      if (!user) {
+        setState((s) => ({
+          ...s,
+          isSyncing: false,
+          error: 'Could not fetch Google profile. Try signing out and back in.'
+        }));
+        return;
       }
-    },
-    []
-  );
+
+      const newInfo: MemberInfo = {
+        name: memberName,
+        email: user.email,
+        photoUrl: user.picture
+      };
+
+      setState((s) => {
+        const updated = { ...s.memberProfiles };
+        // Unlink any member that previously had this email
+        for (const key of Object.keys(updated)) {
+          if (updated[key].email === user.email && key !== memberName) {
+            updated[key] = { ...updated[key], email: '', photoUrl: '' };
+          }
+        }
+        updated[memberName] = newInfo;
+        return { ...s, memberProfiles: updated };
+      });
+
+      // Build full profile list from current state and write all at once
+      setState((s) => {
+        const allProfiles: MemberInfo[] = s.members.map((m) => {
+          if (m === memberName) return newInfo;
+          const existing = s.memberProfiles[m];
+          if (existing && existing.email === user.email) {
+            return { name: m, email: '', photoUrl: '' };
+          }
+          return existing || { name: m, email: '', photoUrl: '' };
+        });
+        sheetsApi
+          .writeAllMemberProfiles(ssId, allProfiles)
+          .then(() => {
+            setState((prev) => ({ ...prev, isSyncing: false }));
+          })
+          .catch(() => {
+            setState((prev) => ({ ...prev, isSyncing: false }));
+          });
+        return s;
+      });
+    } catch {
+      setState((s) => ({
+        ...s,
+        isSyncing: false,
+        error: 'Failed to link profile'
+      }));
+    }
+  }, []);
 
   const settleUp = useCallback(
     async (from: string, to: string, amount: number) => {

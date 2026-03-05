@@ -5,7 +5,12 @@ import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import { CATEGORIES, CURRENCIES, type SplitType } from '../types';
 import { calculateSplits } from '../utils/balance';
-import { todayStr, formatCurrency, getCategoryEmoji, parseAmount } from '../utils/format';
+import {
+  todayStr,
+  formatCurrency,
+  getCategoryEmoji,
+  parseAmount
+} from '../utils/format';
 import {
   ChevronLeft,
   Check,

@@ -69,7 +69,7 @@ export const CATEGORIES = [
   'Sports',
   'Pets',
   'Services',
-  'Payment',
+  'Payment'
 ] as const;
 
 export interface MemberInfo {

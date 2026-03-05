@@ -361,7 +361,9 @@ export async function deleteExpenseRow(
   });
 }
 
-export async function readMemberProfiles(spreadsheetId: string): Promise<MemberInfo[]> {
+export async function readMemberProfiles(
+  spreadsheetId: string
+): Promise<MemberInfo[]> {
   const data = await apiRequest<{ values?: string[][] }>(
     `${SHEETS_API}/${spreadsheetId}/values/_members!A2:C100`
   ).catch(() => ({ values: undefined }));
@@ -383,7 +385,10 @@ async function ensureMembersSheet(spreadsheetId: string): Promise<void> {
     });
     await apiRequest(
       `${SHEETS_API}/${spreadsheetId}/values/_members!A1:C1?valueInputOption=USER_ENTERED`,
-      { method: 'PUT', body: JSON.stringify({ values: [['Name', 'Email', 'PhotoURL']] }) }
+      {
+        method: 'PUT',
+        body: JSON.stringify({ values: [['Name', 'Email', 'PhotoURL']] })
+      }
     );
   }
 }

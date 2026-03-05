@@ -44,7 +44,10 @@ export default function ExpensesPage() {
   }, [filtered]);
 
   const filteredTotal = useMemo(
-    () => filtered.filter((e) => e.category !== 'Payment').reduce((sum, e) => sum + e.cost, 0),
+    () =>
+      filtered
+        .filter((e) => e.category !== 'Payment')
+        .reduce((sum, e) => sum + e.cost, 0),
     [filtered]
   );
 
@@ -99,7 +102,7 @@ export default function ExpensesPage() {
           <div className="bg-bg-card border-border/50 mb-4 flex items-center justify-between rounded-xl border px-4 py-2.5">
             <span className="text-text-muted text-xs">
               {filtered.length} expense{filtered.length !== 1 ? 's' : ''}
-              {(search || categoryFilter !== 'all') ? ' (filtered)' : ''}
+              {search || categoryFilter !== 'all' ? ' (filtered)' : ''}
             </span>
             <span className="text-text-primary text-sm font-bold">
               {formatCurrency(filteredTotal, currency)}

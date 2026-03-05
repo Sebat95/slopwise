@@ -266,7 +266,11 @@ export default function SettingsPage() {
                           ? 'text-positive hover:bg-positive/10'
                           : 'text-text-muted hover:text-primary hover:bg-primary/10'
                       }`}
-                      title={profile?.email ? `Linked to ${profile.email}` : 'Link your Google account'}
+                      title={
+                        profile?.email
+                          ? `Linked to ${profile.email}`
+                          : 'Link your Google account'
+                      }
                     >
                       <Link size={14} />
                     </button>
