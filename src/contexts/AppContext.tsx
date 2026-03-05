@@ -271,16 +271,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await sheetsApi.renameSpreadsheet(ssId, trimmed);
         setState((s) => ({ ...s, isSyncing: false }));
       } catch (err) {
-        sessionStorage.setItem(
-          'splitsheet_spreadsheet_name',
-          oldName || ''
-        );
+        sessionStorage.setItem('splitsheet_spreadsheet_name', oldName || '');
         setState((s) => ({
           ...s,
           spreadsheetName: oldName,
           isSyncing: false,
-          error:
-            err instanceof Error ? err.message : 'Failed to rename sheet'
+          error: err instanceof Error ? err.message : 'Failed to rename sheet'
         }));
       }
     },

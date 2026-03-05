@@ -66,102 +66,136 @@ export default function SpendingChart({ expenses, members }: Props) {
     return { x, y, w, h };
   }, []);
 
-  const svgPoint = useCallback((clientX: number, clientY: number) => {
-    const svg = svgRef.current;
-    if (!svg) return { x: 0, y: 0 };
-    const rect = svg.getBoundingClientRect();
-    return {
-      x: ((clientX - rect.left) / rect.width) * viewBox.w + viewBox.x,
-      y: ((clientY - rect.top) / rect.height) * viewBox.h + viewBox.y,
-    };
-  }, [viewBox]);
+  const svgPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const svg = svgRef.current;
+      if (!svg) return { x: 0, y: 0 };
+      const rect = svg.getBoundingClientRect();
+      return {
+        x: ((clientX - rect.left) / rect.width) * viewBox.w + viewBox.x,
+        y: ((clientY - rect.top) / rect.height) * viewBox.h + viewBox.y
+      };
+    },
+    [viewBox]
+  );
 
-  const zoom = useCallback((factor: number, cx?: number, cy?: number) => {
-    setViewBox((prev) => {
-      const pivotX = cx ?? prev.x + prev.w / 2;
-      const pivotY = cy ?? prev.y + prev.h / 2;
-      const nw = prev.w * factor;
-      const nh = prev.h * factor;
-      return clampVB({
-        x: pivotX - (pivotX - prev.x) * factor,
-        y: pivotY - (pivotY - prev.y) * factor,
-        w: nw,
-        h: nh,
+  const zoom = useCallback(
+    (factor: number, cx?: number, cy?: number) => {
+      setViewBox((prev) => {
+        const pivotX = cx ?? prev.x + prev.w / 2;
+        const pivotY = cy ?? prev.y + prev.h / 2;
+        const nw = prev.w * factor;
+        const nh = prev.h * factor;
+        return clampVB({
+          x: pivotX - (pivotX - prev.x) * factor,
+          y: pivotY - (pivotY - prev.y) * factor,
+          w: nw,
+          h: nh
+        });
       });
-    });
-  }, [clampVB]);
+    },
+    [clampVB]
+  );
 
   const resetView = useCallback(() => setViewBox(defaultVB), []);
 
   // Mouse wheel zoom
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const pt = svgPoint(e.clientX, e.clientY);
-    const factor = e.deltaY > 0 ? 1.15 : 0.87;
-    zoom(factor, pt.x, pt.y);
-  }, [svgPoint, zoom]);
+  const onWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      const pt = svgPoint(e.clientX, e.clientY);
+      const factor = e.deltaY > 0 ? 1.15 : 0.87;
+      zoom(factor, pt.x, pt.y);
+    },
+    [svgPoint, zoom]
+  );
 
   // Mouse drag
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    dragging.current = true;
-    const pt = svgPoint(e.clientX, e.clientY);
-    dragStart.current = { x: pt.x, y: pt.y, vbx: viewBox.x, vby: viewBox.y };
-    e.preventDefault();
-  }, [svgPoint, viewBox]);
+  const onMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      dragging.current = true;
+      const pt = svgPoint(e.clientX, e.clientY);
+      dragStart.current = { x: pt.x, y: pt.y, vbx: viewBox.x, vby: viewBox.y };
+      e.preventDefault();
+    },
+    [svgPoint, viewBox]
+  );
 
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragging.current) return;
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const dx = ((e.movementX) / rect.width) * viewBox.w;
-    const dy = ((e.movementY) / rect.height) * viewBox.h;
-    setViewBox((prev) => clampVB({ ...prev, x: prev.x - dx, y: prev.y - dy }));
-  }, [viewBox, clampVB]);
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!dragging.current) return;
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const dx = (e.movementX / rect.width) * viewBox.w;
+      const dy = (e.movementY / rect.height) * viewBox.h;
+      setViewBox((prev) =>
+        clampVB({ ...prev, x: prev.x - dx, y: prev.y - dy })
+      );
+    },
+    [viewBox, clampVB]
+  );
 
-  const onMouseUp = useCallback(() => { dragging.current = false; }, []);
+  const onMouseUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
 
   // Touch pan & pinch-zoom
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      dragging.current = true;
-      const pt = svgPoint(e.touches[0].clientX, e.touches[0].clientY);
-      dragStart.current = { x: pt.x, y: pt.y, vbx: viewBox.x, vby: viewBox.y };
-    }
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      lastTouchDist.current = Math.sqrt(dx * dx + dy * dy);
-      lastTouchCenter.current = {
-        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-      };
-    }
-  }, [svgPoint, viewBox]);
+  const onTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length === 1) {
+        dragging.current = true;
+        const pt = svgPoint(e.touches[0].clientX, e.touches[0].clientY);
+        dragStart.current = {
+          x: pt.x,
+          y: pt.y,
+          vbx: viewBox.x,
+          vby: viewBox.y
+        };
+      }
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastTouchDist.current = Math.sqrt(dx * dx + dy * dy);
+        lastTouchCenter.current = {
+          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+        };
+      }
+    },
+    [svgPoint, viewBox]
+  );
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1 && dragging.current) {
-      if (!svgRef.current) return;
-      const pt = svgPoint(e.touches[0].clientX, e.touches[0].clientY);
-      const startPt = dragStart.current;
-      setViewBox((prev) =>
-        clampVB({ ...prev, x: startPt.vbx + (startPt.x - pt.x), y: startPt.vby + (startPt.y - pt.y) })
-      );
-    }
-    if (e.touches.length === 2 && lastTouchDist.current !== null) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const factor = lastTouchDist.current / dist;
-      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const pt = svgPoint(cx, cy);
-      zoom(factor, pt.x, pt.y);
-      lastTouchDist.current = dist;
-    }
-  }, [svgPoint, clampVB, zoom]);
+  const onTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length === 1 && dragging.current) {
+        if (!svgRef.current) return;
+        const pt = svgPoint(e.touches[0].clientX, e.touches[0].clientY);
+        const startPt = dragStart.current;
+        setViewBox((prev) =>
+          clampVB({
+            ...prev,
+            x: startPt.vbx + (startPt.x - pt.x),
+            y: startPt.vby + (startPt.y - pt.y)
+          })
+        );
+      }
+      if (e.touches.length === 2 && lastTouchDist.current !== null) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const factor = lastTouchDist.current / dist;
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const pt = svgPoint(cx, cy);
+        zoom(factor, pt.x, pt.y);
+        lastTouchDist.current = dist;
+      }
+    },
+    [svgPoint, clampVB, zoom]
+  );
 
   const onTouchEnd = useCallback(() => {
     dragging.current = false;
@@ -186,8 +220,7 @@ export default function SpendingChart({ expenses, members }: Props) {
 
   const xScale = (i: number) =>
     PAD_L + (i / (cumulativeData.length - 1)) * chartW;
-  const yScale = (v: number) =>
-    PAD_T + chartH - (v / maxVal) * chartH;
+  const yScale = (v: number) => PAD_T + chartH - (v / maxVal) * chartH;
 
   const gridLines = 4;
   const yTicks = Array.from({ length: gridLines + 1 }, (_, i) =>
@@ -234,7 +267,7 @@ export default function SpendingChart({ expenses, members }: Props) {
         </div>
       </div>
 
-      <div className="touch-none select-none overflow-hidden rounded-lg">
+      <div className="touch-none overflow-hidden rounded-lg select-none">
         <svg
           ref={svgRef}
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}

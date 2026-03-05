@@ -112,7 +112,10 @@ export default function BalancesPage() {
             </span>
             {hasDateFilter && (
               <button
-                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                onClick={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                }}
                 className="text-primary ml-auto text-xs hover:underline"
               >
                 Clear
