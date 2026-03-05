@@ -66,30 +66,32 @@ export default function ExpenseCard({
           </div>
         )}
       </div>
-      <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        {onEdit && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(expense.id);
-            }}
-            className="text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg p-1.5 transition-colors"
-          >
-            <Pencil size={14} />
-          </button>
-        )}
-        {onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(expense.id);
-            }}
-            className="text-text-muted hover:text-danger hover:bg-danger/10 rounded-lg p-1.5 transition-colors"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
-      </div>
+      {(onEdit || onDelete) && (
+        <div className="flex shrink-0 flex-col gap-1">
+          {onEdit && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(expense.id);
+              }}
+              className="text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg p-1.5 transition-colors"
+            >
+              <Pencil size={14} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(expense.id);
+              }}
+              className="text-text-muted hover:text-danger hover:bg-danger/10 rounded-lg p-1.5 transition-colors"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
