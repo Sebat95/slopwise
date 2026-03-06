@@ -6,7 +6,7 @@ RUN rm -rf /opt/yarn* /usr/local/bin/yarn* && \
     npm install -g corepack@latest && \
     corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn ./.yarn
+#COPY .yarn ./.yarn
 RUN yarn install --immutable
 COPY . .
 RUN yarn run build
