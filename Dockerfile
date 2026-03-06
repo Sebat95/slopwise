@@ -1,8 +1,10 @@
 ### Build Stage
-FROM node:25-slim AS build
+FROM node:25-alpine AS build
 WORKDIR /app
-RUN npm install -g corepack && corepack enable
-RUN corepack prepare yarn@stable --activate
+# delete legacy yarn and install new with corepack
+RUN rm -rf /opt/yarn* /usr/local/bin/yarn* && \
+    npm install -g corepack@latest && \
+    corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn ./.yarn
 RUN yarn install --immutable
