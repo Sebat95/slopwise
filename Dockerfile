@@ -1,8 +1,10 @@
 ### Build Stage
 FROM node:25-slim AS build
 WORKDIR /app
-RUN corepack enable
+RUN npm install -g corepack && corepack enable
+RUN corepack prepare yarn@stable --activate
 COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn ./.yarn
 RUN yarn install --immutable
 COPY . .
 RUN yarn run build
