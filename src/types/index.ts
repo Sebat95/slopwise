@@ -73,7 +73,7 @@ export const CATEGORIES = [
   'Sports',
   'Pets',
   'Services',
-  'Payment',
+  'Payment'
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];

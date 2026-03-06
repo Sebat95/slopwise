@@ -72,8 +72,14 @@ export default function DashboardPage() {
 
   const [visibleCount, setVisibleCount] = useState(10);
 
-  const netBalances = useMemo(() => calculateNetBalances(expenses, members), [expenses, members]);
-  const debts = useMemo(() => simplifyDebts(expenses, members), [expenses, members]);
+  const netBalances = useMemo(
+    () => calculateNetBalances(expenses, members),
+    [expenses, members]
+  );
+  const debts = useMemo(
+    () => simplifyDebts(expenses, members),
+    [expenses, members]
+  );
   const allRecent = useMemo(() => [...expenses].reverse(), [expenses]);
   const recentExpenses = allRecent.slice(0, visibleCount);
   const hasMore = visibleCount < allRecent.length;
