@@ -1,8 +1,8 @@
 ### Build Stage
-FROM node:25-alpine AS build
+FROM node:25-slim AS build
 WORKDIR /app
-RUN rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg && corepack enable
-COPY package*.json yarn.lock .yarnrc.yml ./
+RUN corepack enable
+COPY package.json yarn.lock .yarnrc.yml ./
 RUN yarn install --immutable
 COPY . .
 RUN yarn run build
