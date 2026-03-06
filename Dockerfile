@@ -1,8 +1,9 @@
 ### Build Stage
-FROM node:25-alpine AS build 
+FROM node:25-alpine AS build
 WORKDIR /app
-COPY package*.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN corepack enable
+COPY package*.json yarn.lock .yarnrc.yml ./
+RUN yarn install --immutable
 COPY . .
 RUN yarn run build
 
