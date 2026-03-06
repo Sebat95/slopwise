@@ -40,11 +40,11 @@ export default defineConfig({
           },
           {
             urlPattern: /^https:\/\/sheets\.googleapis\.com\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'sheets-api',
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 }
-            }
+            handler: 'NetworkOnly'
+          },
+          {
+            urlPattern: /^https:\/\/www\.googleapis\.com\/.*/i,
+            handler: 'NetworkOnly'
           }
         ]
       }

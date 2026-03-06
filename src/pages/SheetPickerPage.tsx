@@ -84,7 +84,7 @@ export default function SheetPickerPage() {
     setCreating(true);
     setError(null);
     try {
-      const id = await createSpreadsheet(newName.trim(), members, currency);
+      const id = await createSpreadsheet(newName.trim(), members, newCurrency);
       selectSpreadsheet(id, newName.trim());
       await loadData();
       navigate('/dashboard');

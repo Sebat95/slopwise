@@ -1,25 +1,15 @@
-export interface Member {
-  name: string;
-  email?: string;
-}
-
 export type SplitType = 'equal' | 'exact' | 'percentage' | 'shares';
-
-export interface ExpenseSplit {
-  memberName: string;
-  amount: number;
-}
 
 export interface Expense {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   description: string;
   category: string;
   cost: number;
   currency: string;
   paidBy: string;
   splitType: SplitType;
-  splits: Record<string, number>; // memberName -> net amount (+ owed to them, - they owe)
+  splits: Record<string, number>;
   notes?: string;
 }
 
@@ -49,6 +39,20 @@ export interface GoogleTokenInfo {
   expiry_time: number;
 }
 
+export interface MemberInfo {
+  name: string;
+  email: string;
+  photoUrl: string;
+}
+
+export interface GoogleUserProfile {
+  name: string;
+  email: string;
+  picture: string;
+}
+
+export const FIXED_COLUMNS = 5;
+
 export const CATEGORIES = [
   'General',
   'Groceries',
@@ -69,14 +73,10 @@ export const CATEGORIES = [
   'Sports',
   'Pets',
   'Services',
-  'Payment'
+  'Payment',
 ] as const;
 
-export interface MemberInfo {
-  name: string;
-  email: string;
-  photoUrl: string;
-}
+export type Category = (typeof CATEGORIES)[number];
 
 export const CURRENCIES = [
   'USD',
@@ -90,3 +90,5 @@ export const CURRENCIES = [
   'CNY',
   'BRL'
 ] as const;
+
+export type Currency = (typeof CURRENCIES)[number];

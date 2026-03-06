@@ -49,6 +49,7 @@ export default function DashboardPage() {
     if (expenses.length === 0 && !isLoading) {
       loadData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startEditing = () => {
@@ -71,11 +72,8 @@ export default function DashboardPage() {
 
   const [visibleCount, setVisibleCount] = useState(10);
 
-  const netBalances = calculateNetBalances(expenses, members);
-  const debts = useMemo(
-    () => simplifyDebts(expenses, members),
-    [expenses, members]
-  );
+  const netBalances = useMemo(() => calculateNetBalances(expenses, members), [expenses, members]);
+  const debts = useMemo(() => simplifyDebts(expenses, members), [expenses, members]);
   const allRecent = useMemo(() => [...expenses].reverse(), [expenses]);
   const recentExpenses = allRecent.slice(0, visibleCount);
   const hasMore = visibleCount < allRecent.length;

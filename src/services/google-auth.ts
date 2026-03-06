@@ -1,4 +1,4 @@
-import type { GoogleTokenInfo } from '../types';
+import type { GoogleTokenInfo, GoogleUserProfile } from '../types';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -34,17 +34,32 @@ declare global {
   }
 }
 
+function isValidToken(obj: unknown): obj is GoogleTokenInfo {
+  if (!obj || typeof obj !== 'object') return false;
+  const t = obj as Record<string, unknown>;
+  return (
+    typeof t.access_token === 'string' &&
+    typeof t.expiry_time === 'number' &&
+    typeof t.token_type === 'string'
+  );
+}
+
 function getStoredToken(): GoogleTokenInfo | null {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    const token: GoogleTokenInfo = JSON.parse(raw);
-    if (Date.now() >= token.expiry_time) {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isValidToken(parsed)) {
       sessionStorage.removeItem(SESSION_KEY);
       return null;
     }
-    return token;
+    if (Date.now() >= parsed.expiry_time) {
+      sessionStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return parsed;
   } catch {
+    sessionStorage.removeItem(SESSION_KEY);
     return null;
   }
 }
@@ -87,8 +102,11 @@ export function waitForGoogleScript(): Promise<void> {
 export async function signIn(clientId: string): Promise<GoogleTokenInfo> {
   await waitForGoogleScript();
 
+  const gsi = window.google?.accounts?.oauth2;
+  if (!gsi) throw new Error('Google Identity Services not available');
+
   return new Promise((resolve, reject) => {
-    const tokenClient = window.google!.accounts.oauth2.initTokenClient({
+    const tokenClient = gsi.initTokenClient({
       client_id: clientId,
       scope: SCOPES,
       callback: (response) => {
@@ -115,17 +133,15 @@ export async function signIn(clientId: string): Promise<GoogleTokenInfo> {
   });
 }
 
-export async function refreshToken(clientId: string): Promise<GoogleTokenInfo> {
+export async function refreshToken(
+  clientId: string
+): Promise<GoogleTokenInfo> {
   const existing = getStoredToken();
   if (existing) return existing;
   return signIn(clientId);
 }
 
-export async function fetchUserProfile(): Promise<{
-  name: string;
-  email: string;
-  picture: string;
-} | null> {
+export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
   const token = getAccessToken();
   if (!token) return null;
   try {
@@ -133,11 +149,11 @@ export async function fetchUserProfile(): Promise<{
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data: Record<string, unknown> = await res.json();
     return {
-      name: data.name || '',
-      email: data.email || '',
-      picture: data.picture || ''
+      name: typeof data.name === 'string' ? data.name : '',
+      email: typeof data.email === 'string' ? data.email : '',
+      picture: typeof data.picture === 'string' ? data.picture : ''
     };
   } catch {
     return null;
@@ -147,8 +163,10 @@ export async function fetchUserProfile(): Promise<{
 export function signOut(): void {
   const token = getAccessToken();
   if (token) {
-    fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
-      method: 'POST'
+    fetch('https://oauth2.googleapis.com/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `token=${encodeURIComponent(token)}`
     }).catch(() => {});
   }
   clearToken();

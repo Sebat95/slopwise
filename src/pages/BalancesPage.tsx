@@ -71,11 +71,12 @@ export default function BalancesPage() {
     return totals;
   }, [filteredExpenses, members]);
 
-  const netBalances = calculateNetBalances(filteredExpenses, members);
-  const debts = simplifyDebts(filteredExpenses, members);
+  const netBalances = useMemo(() => calculateNetBalances(filteredExpenses, members), [filteredExpenses, members]);
+  const debts = useMemo(() => simplifyDebts(filteredExpenses, members), [filteredExpenses, members]);
 
-  const sorted = [...members].sort(
-    (a, b) => (netBalances[b] || 0) - (netBalances[a] || 0)
+  const sorted = useMemo(
+    () => [...members].sort((a, b) => (netBalances[b] || 0) - (netBalances[a] || 0)),
+    [members, netBalances]
   );
 
   const isRangeModified = dateFrom !== null || dateTo !== null;

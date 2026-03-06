@@ -17,7 +17,7 @@ export default function Avatar({ name, size = 'md' }: AvatarProps) {
   const profile = memberProfiles[name];
   const photoUrl = profile?.photoUrl;
 
-  if (photoUrl) {
+  if (photoUrl && photoUrl.startsWith('https://')) {
     return (
       <img
         src={photoUrl}
