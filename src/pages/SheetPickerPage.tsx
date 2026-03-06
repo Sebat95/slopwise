@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { listSpreadsheets, createSpreadsheet } from '../services/sheets-api';
-import { parseSplitwiseCSV } from '../utils/csv';
+import { parseCompetitorCSV } from '../utils/csv';
 import type { SpreadsheetInfo } from '../types';
 import { CURRENCIES } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -103,10 +103,10 @@ export default function SheetPickerPage() {
 
     try {
       const text = await importFile.text();
-      const { members, expenses } = parseSplitwiseCSV(text);
+      const { members, expenses } = parseCompetitorCSV(text);
       if (members.length === 0) {
         setError(
-          'Could not parse CSV. Make sure it matches Splitwise export format.'
+          'Could not parse CSV. Make sure it matches Competitor export format.'
         );
         setImporting(false);
         return;
@@ -218,7 +218,7 @@ export default function SheetPickerPage() {
           Import from CSV
         </h1>
         <p className="text-text-secondary mb-6 text-sm">
-          Import a Splitwise CSV export. The app will create a new spreadsheet
+          Import a Competitor CSV export. The app will create a new spreadsheet
           with the imported data.
         </p>
 

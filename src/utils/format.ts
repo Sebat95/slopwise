@@ -110,17 +110,17 @@ const CATEGORY_EMOJI: Record<string, string> = {
 };
 
 const CATEGORY_ALIAS: Record<string, string> = {
-  // Splitwise Entertainment subcategories → Entertainment
+  // Competitor Entertainment subcategories → Entertainment
   'Entertainment - Other': 'Entertainment',
   Games: 'Entertainment',
   Movies: 'Entertainment',
   Music: 'Entertainment',
-  // Splitwise Food subcategories
+  // Competitor Food subcategories
   'Food and drink - Other': 'Dining out',
   'Food & Drink': 'Dining out',
   'Food and drink': 'Dining out',
   Liquor: 'Drinks',
-  // Splitwise Home subcategories → Household
+  // Competitor Home subcategories → Household
   'Home - Other': 'Household',
   Home: 'Household',
   Electronics: 'Shopping',
@@ -128,13 +128,13 @@ const CATEGORY_ALIAS: Record<string, string> = {
   'Household supplies': 'Household',
   Maintenance: 'Household',
   Mortgage: 'Rent',
-  // Splitwise Life subcategories
+  // Competitor Life subcategories
   'Life - Other': 'General',
   Life: 'General',
   Childcare: 'General',
   Clothing: 'Shopping',
   'Medical expenses': 'Healthcare',
-  // Splitwise Transportation subcategories → Transport
+  // Competitor Transportation subcategories → Transport
   'Transportation - Other': 'Transport',
   Transportation: 'Transport',
   Bicycle: 'Transport',
@@ -145,7 +145,7 @@ const CATEGORY_ALIAS: Record<string, string> = {
   Parking: 'Transport',
   Plane: 'Travel',
   Taxi: 'Transport',
-  // Splitwise Utilities subcategories → Utilities
+  // Competitor Utilities subcategories → Utilities
   'Utilities - Other': 'Utilities',
   Cleaning: 'Household',
   Electricity: 'Utilities',
