@@ -1,7 +1,7 @@
 import type { Expense } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export function parseSplitwiseCSV(csvText: string): {
+export function parseCompetitorCSV(csvText: string): {
   members: string[];
   expenses: Expense[];
 } {

@@ -1,4 +1,4 @@
-# SplitSheet — Splitwise Clone Powered by Google Sheets
+# Slopwise — Expense tracking Clone Powered by Google Sheets
 
 A fully functional, mobile-first PWA for splitting expenses with friends. All data is stored in your own Google Sheets — no server, no database, fully stateless.
 
@@ -9,7 +9,7 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 - **Balance Calculation** — Real-time net balances for each member with simplified debt optimization
 - **Settle Up** — Record payments between members to settle debts
 - **Google Sheets Backend** — All data stored in your Google Sheets, accessible and editable directly
-- **Splitwise CSV Interop** — Import Splitwise CSV exports and export in the same format
+- **CSV Interop** — Import CSV exports from major competitor and export in the same format
 - **PWA** — Installable on mobile and desktop, works offline for cached data
 - **Sheet Picker** — Choose any spreadsheet from your Google Drive or create a new one
 - **Multiple Groups** — Each spreadsheet is a group; switch between them freely
@@ -29,7 +29,7 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 
 ```bash
 git clone <repo-url>
-cd splitwise-sheets
+cd slopwise
 yarn install
 ```
 
@@ -68,7 +68,7 @@ Open http://localhost:5173
 
 ## Google Sheets Data Format
 
-The app stores data in Splitwise-compatible CSV format:
+The app stores data in competitor-compatible CSV format:
 
 | Date       | Description | Category       | Cost  | Currency | Alice  | Bob    | Charlie |
 | ---------- | ----------- | -------------- | ----- | -------- | ------ | ------ | ------- |
@@ -81,7 +81,7 @@ Each member column shows their **net** for that expense:
 - **Negative** = they owe money
 - **Zero** = not involved or fully settled
 
-This format is directly compatible with Splitwise CSV exports/imports.
+This format is directly compatible with competitor CSV exports/imports.
 
 ## Building for Production
 

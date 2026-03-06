@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
-import { exportToCSV, downloadCSV, parseSplitwiseCSV } from '../utils/csv';
+import { exportToCSV, downloadCSV, parseCompetitorCSV } from '../utils/csv';
 import {
   LogOut,
   UserPlus,
@@ -95,10 +95,10 @@ export default function SettingsPage() {
     try {
       const text = await file.text();
       const { members: csvMembers, expenses: csvExpenses } =
-        parseSplitwiseCSV(text);
+        parseCompetitorCSV(text);
       if (csvMembers.length === 0) {
         alert(
-          'Could not parse CSV file. Make sure it matches Splitwise export format.'
+          'Could not parse CSV file. Make sure it matches Competitor export format.'
         );
         return;
       }
@@ -297,7 +297,7 @@ export default function SettingsPage() {
                   Export CSV
                 </p>
                 <p className="text-text-muted text-xs">
-                  Splitwise-compatible format
+                  Competitor-compatible format
                 </p>
               </div>
             </button>
@@ -319,7 +319,7 @@ export default function SettingsPage() {
                   Import CSV
                 </p>
                 <p className="text-text-muted text-xs">
-                  Import Splitwise CSV export
+                  Import Competitor CSV export
                 </p>
               </div>
             </button>
