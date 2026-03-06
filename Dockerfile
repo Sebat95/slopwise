@@ -9,6 +9,10 @@ COPY package.json yarn.lock .yarnrc.yml ./
 #COPY .yarn ./.yarn
 RUN yarn install --immutable
 COPY . .
+# args like the env.example
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
 RUN yarn run build
 
 ### Serve Stage
