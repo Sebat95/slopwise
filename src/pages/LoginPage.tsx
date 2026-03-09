@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Receipt,
@@ -12,6 +12,15 @@ import {
 export default function LoginPage() {
   const { clientId, setClientId, login, isLoading, error } = useAuth();
   const [showSetup, setShowSetup] = useState(true);
+  const isAuthDone = useRef(false);
+  const isInitialClientIdPresent = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthDone.current) {
+      isAuthDone.current = true;
+      isInitialClientIdPresent.current = clientId != null && clientId !== '';
+    }
+  }, [clientId]);
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-6 py-12">
@@ -26,7 +35,7 @@ export default function LoginPage() {
       </p>
 
       <div className="w-full max-w-sm space-y-4">
-        {!clientId && (
+        {!isInitialClientIdPresent.current && (
           <>
             <button
               onClick={() => setShowSetup((s) => !s)}
