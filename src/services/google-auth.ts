@@ -80,20 +80,36 @@ export function isTokenValid(): boolean {
   return getStoredToken() !== null;
 }
 
+function loadGsiScript(): void {
+  if (document.querySelector('script[src*="accounts.google.com/gsi/client"]')) return;
+  const script = document.createElement('script');
+  script.src = 'https://accounts.google.com/gsi/client';
+  script.async = true;
+  document.head.appendChild(script);
+}
+
 export function waitForGoogleScript(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.google?.accounts?.oauth2) {
       resolve();
       return;
     }
+
+    loadGsiScript();
+
     let attempts = 0;
+    const maxAttempts = 100; // 20 seconds
     const interval = setInterval(() => {
       if (window.google?.accounts?.oauth2) {
         clearInterval(interval);
         resolve();
-      } else if (++attempts > 50) {
+      } else if (++attempts > maxAttempts) {
         clearInterval(interval);
-        reject(new Error('Google Identity Services script failed to load'));
+        reject(
+          new Error(
+            'Google sign-in script failed to load. Check your internet connection and try again.'
+          )
+        );
       }
     }, 200);
   });
