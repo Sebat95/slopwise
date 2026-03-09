@@ -7,7 +7,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email'
 ].join(' ');
 
-const SESSION_KEY = 'splitsheet_token';
+const SESSION_KEY = 'slopwise_token';
 
 declare global {
   interface Window {
@@ -81,7 +81,8 @@ export function isTokenValid(): boolean {
 }
 
 function loadGsiScript(): void {
-  if (document.querySelector('script[src*="accounts.google.com/gsi/client"]')) return;
+  if (document.querySelector('script[src*="accounts.google.com/gsi/client"]'))
+    return;
   const script = document.createElement('script');
   script.src = 'https://accounts.google.com/gsi/client';
   script.async = true;

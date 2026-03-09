@@ -51,13 +51,13 @@ type AppContextValue = AppState & AppActions;
 const AppContext = createContext<AppContextValue | null>(null);
 
 function getSsId(): string | null {
-  return sessionStorage.getItem('splitsheet_spreadsheet_id');
+  return sessionStorage.getItem('slopwise_spreadsheet_id');
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>({
     spreadsheetId: getSsId(),
-    spreadsheetName: sessionStorage.getItem('splitsheet_spreadsheet_name'),
+    spreadsheetName: sessionStorage.getItem('slopwise_spreadsheet_name'),
     members: [],
     memberProfiles: {},
     expenses: [],
@@ -72,8 +72,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
 
   const selectSpreadsheet = useCallback((id: string, name: string) => {
-    sessionStorage.setItem('splitsheet_spreadsheet_id', id);
-    sessionStorage.setItem('splitsheet_spreadsheet_name', name);
+    sessionStorage.setItem('slopwise_spreadsheet_id', id);
+    sessionStorage.setItem('slopwise_spreadsheet_name', name);
     setState((s) => ({
       ...s,
       spreadsheetId: id,
@@ -425,14 +425,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const trimmed = newName.trim();
     const oldName = stateRef.current.spreadsheetName;
 
-    sessionStorage.setItem('splitsheet_spreadsheet_name', trimmed);
+    sessionStorage.setItem('slopwise_spreadsheet_name', trimmed);
     setState((s) => ({ ...s, spreadsheetName: trimmed, isSyncing: true }));
 
     try {
       await sheetsApi.renameSpreadsheet(ssId, trimmed);
       setState((s) => ({ ...s, isSyncing: false }));
     } catch (err) {
-      sessionStorage.setItem('splitsheet_spreadsheet_name', oldName || '');
+      sessionStorage.setItem('slopwise_spreadsheet_name', oldName || '');
       setState((s) => ({
         ...s,
         spreadsheetName: oldName,
@@ -478,8 +478,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const disconnect = useCallback(() => {
-    sessionStorage.removeItem('splitsheet_spreadsheet_id');
-    sessionStorage.removeItem('splitsheet_spreadsheet_name');
+    sessionStorage.removeItem('slopwise_spreadsheet_id');
+    sessionStorage.removeItem('slopwise_spreadsheet_name');
     setState((s) => ({
       ...s,
       spreadsheetId: null,
