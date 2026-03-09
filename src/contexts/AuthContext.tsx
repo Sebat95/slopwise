@@ -29,7 +29,7 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const CLIENT_ID_KEY = 'splitsheet_client_id';
+const CLIENT_ID_KEY = 'slopwise_client_id';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -80,8 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     authSignOut();
     setState((s) => ({ ...s, isAuthenticated: false }));
-    sessionStorage.removeItem('splitsheet_spreadsheet_id');
-    sessionStorage.removeItem('splitsheet_spreadsheet_name');
+    sessionStorage.removeItem('slopwise_spreadsheet_id');
+    sessionStorage.removeItem('slopwise_spreadsheet_name');
   }, []);
 
   return (

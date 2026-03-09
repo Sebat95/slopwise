@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'SplitSheet - Expense Splitting',
-        short_name: 'SplitSheet',
+        name: 'SlopWise - Expense Splitting',
+        short_name: 'SlopWise',
         description: 'Split expenses with friends, powered by Google Sheets',
         theme_color: '#5bc5a7',
         background_color: '#1a1a2e',
@@ -33,17 +33,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/accounts\.google\.com\/.*/i,
-            handler: 'NetworkOnly'
-          },
-          {
-            urlPattern: /^https:\/\/sheets\.googleapis\.com\/.*/i,
-            handler: 'NetworkOnly'
-          },
-          {
-            urlPattern: /^https:\/\/www\.googleapis\.com\/.*/i,
+            urlPattern:
+              /^https:\/\/(accounts\.google\.com|oauth2\.googleapis\.com|www\.googleapis\.com|sheets\.googleapis\.com|lh3\.googleusercontent\.com)\/.*/i,
             handler: 'NetworkOnly'
           }
         ]
