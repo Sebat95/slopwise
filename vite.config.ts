@@ -36,8 +36,7 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
-            urlPattern:
-              /^https:\/\/(accounts\.google\.com|oauth2\.googleapis\.com|www\.googleapis\.com|sheets\.googleapis\.com|lh3\.googleusercontent\.com)\/.*/i,
+            urlPattern: /^https?:\/\/.+/i,
             handler: 'NetworkOnly'
           }
         ]
