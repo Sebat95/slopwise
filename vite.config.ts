@@ -33,11 +33,25 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
-            urlPattern:
-              /^https:\/\/(accounts\.google\.com|oauth2\.googleapis\.com|www\.googleapis\.com|sheets\.googleapis\.com|lh3\.googleusercontent\.com)\/.*/i,
+            urlPattern: /^https:\/\/accounts\.google\.com\/.*/i,
+            handler: 'NetworkOnly'
+          },
+          {
+            urlPattern: /^https:\/\/sheets\.googleapis\.com\/.*/i,
+            handler: 'NetworkOnly'
+          },
+          {
+            urlPattern: /^https:\/\/www\.googleapis\.com\/.*/i,
+            handler: 'NetworkOnly'
+          },
+          {
+            urlPattern: /^https:\/\/oauth2\.googleapis\.com\/.*/i,
+            handler: 'NetworkOnly'
+          },
+          {
+            urlPattern: /^https:\/\/lh3\.googleusercontent\.com\/.*/i,
             handler: 'NetworkOnly'
           }
         ]
