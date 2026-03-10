@@ -80,8 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     authSignOut();
     setState((s) => ({ ...s, isAuthenticated: false }));
-    sessionStorage.removeItem('slopwise_spreadsheet_id');
-    sessionStorage.removeItem('slopwise_spreadsheet_name');
+    localStorage.removeItem('slopwise_spreadsheet_id');
+    localStorage.removeItem('slopwise_spreadsheet_name');
   }, []);
 
   return (
