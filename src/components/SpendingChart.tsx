@@ -1,7 +1,24 @@
 import { useMemo, useRef, useCallback } from 'react';
 import type { Expense } from '../types';
-import { getAvatarColor } from '../utils/format';
 import { format, parseISO } from 'date-fns';
+
+const CHART_COLORS = [
+  '#5bc5a7',
+  '#e74c3c',
+  '#3498db',
+  '#f39c12',
+  '#9b59b6',
+  '#e67e22',
+  '#e91e63',
+  '#00bcd4',
+  '#2ecc71',
+  '#ff6b6b',
+  '#4ecdc4',
+  '#ffe66d',
+  '#a29bfe',
+  '#fd79a8',
+  '#636e72',
+];
 
 interface Props {
   expenses: Expense[];
@@ -255,8 +272,8 @@ export default function SpendingChart({
           );
         })}
 
-        {members.map((m) => {
-          const color = getAvatarColor(m);
+        {members.map((m, mi) => {
+          const color = CHART_COLORS[mi % CHART_COLORS.length];
           const pathD = visible
             .map(
               (pt, i) =>
@@ -306,8 +323,8 @@ export default function SpendingChart({
             fill="var(--color-bg-surface)"
             rx={4}
           />
-          {members.map((m) => {
-            const color = getAvatarColor(m);
+          {members.map((m, mi) => {
+            const color = CHART_COLORS[mi % CHART_COLORS.length];
             const d = allData
               .map(
                 (pt, i) =>
@@ -393,11 +410,11 @@ export default function SpendingChart({
 
       {/* Legend */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-        {members.map((m) => (
+        {members.map((m, mi) => (
           <div key={m} className="flex items-center gap-1.5">
             <div
               className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: getAvatarColor(m) }}
+              style={{ backgroundColor: CHART_COLORS[mi % CHART_COLORS.length] }}
             />
             <span className="text-text-secondary text-xs">{m}</span>
           </div>
