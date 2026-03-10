@@ -425,14 +425,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const trimmed = newName.trim();
     const oldName = stateRef.current.spreadsheetName;
 
-      localStorage.setItem('slopwise_spreadsheet_name', trimmed);
+    localStorage.setItem('slopwise_spreadsheet_name', trimmed);
     setState((s) => ({ ...s, spreadsheetName: trimmed, isSyncing: true }));
 
     try {
       await sheetsApi.renameSpreadsheet(ssId, trimmed);
       setState((s) => ({ ...s, isSyncing: false }));
     } catch (err) {
-        localStorage.setItem('slopwise_spreadsheet_name', oldName || '');
+      localStorage.setItem('slopwise_spreadsheet_name', oldName || '');
       setState((s) => ({
         ...s,
         spreadsheetName: oldName,
