@@ -17,7 +17,7 @@ const CHART_COLORS = [
   '#ffe66d',
   '#a29bfe',
   '#fd79a8',
-  '#636e72',
+  '#636e72'
 ];
 
 interface Props {
@@ -414,7 +414,9 @@ export default function SpendingChart({
           <div key={m} className="flex items-center gap-1.5">
             <div
               className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: CHART_COLORS[mi % CHART_COLORS.length] }}
+              style={{
+                backgroundColor: CHART_COLORS[mi % CHART_COLORS.length]
+              }}
             />
             <span className="text-text-secondary text-xs">{m}</span>
           </div>
