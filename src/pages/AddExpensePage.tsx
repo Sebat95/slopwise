@@ -212,7 +212,6 @@ export default function AddExpensePage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What was this expense for?"
               className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
-              autoFocus
             />
           </div>
 

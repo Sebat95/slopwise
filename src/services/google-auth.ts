@@ -46,29 +46,34 @@ function isValidToken(obj: unknown): obj is GoogleTokenInfo {
 
 function getStoredToken(): GoogleTokenInfo | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isValidToken(parsed)) {
+      localStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem(SESSION_KEY);
       return null;
     }
     if (Date.now() >= parsed.expiry_time) {
+      localStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem(SESSION_KEY);
       return null;
     }
     return parsed;
   } catch {
+    localStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(SESSION_KEY);
     return null;
   }
 }
 
 function storeToken(token: GoogleTokenInfo): void {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(token));
+  localStorage.setItem(SESSION_KEY, JSON.stringify(token));
+  sessionStorage.removeItem(SESSION_KEY);
 }
 
 export function clearToken(): void {
+  localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
 }
 

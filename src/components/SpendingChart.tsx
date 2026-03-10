@@ -99,11 +99,15 @@ export default function SpendingChart({
     [allData, onRangeChange]
   );
 
+  const dragStarted = useRef(false);
+  const DRAG_THRESHOLD = 4;
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent, mode: 'left' | 'right' | 'middle') => {
       e.preventDefault();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       dragMode.current = mode;
+      dragStarted.current = false;
       dragOrigin.current = {
         x: e.clientX,
         startIdx: rangeStart,
@@ -116,8 +120,14 @@ export default function SpendingChart({
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!dragMode.current || !allData) return;
-      const idx = idxFromClientX(e.clientX);
       const origin = dragOrigin.current;
+
+      if (!dragStarted.current) {
+        if (Math.abs(e.clientX - origin.x) < DRAG_THRESHOLD) return;
+        dragStarted.current = true;
+      }
+
+      const idx = idxFromClientX(e.clientX);
 
       if (dragMode.current === 'left') {
         const s = Math.min(idx, rangeEnd);
@@ -342,7 +352,7 @@ export default function SpendingChart({
           className="absolute top-0 cursor-grab active:cursor-grabbing"
           style={{
             left: `${(leftX / W) * 100}%`,
-            width: `${((rightX - leftX) / W) * 100}%`,
+            width: `${Math.max(((rightX - leftX) / W) * 100, 2)}%`,
             height: BRUSH_H
           }}
           onPointerDown={(e) => onPointerDown(e, 'middle')}
@@ -352,30 +362,32 @@ export default function SpendingChart({
 
         {/* Left handle */}
         <div
-          className="absolute top-0 cursor-col-resize"
+          className="absolute cursor-col-resize"
           style={{
             left: `${(leftX / W) * 100}%`,
-            width: 16,
-            height: BRUSH_H,
-            transform: 'translateX(-8px)'
+            width: 36,
+            top: -4,
+            height: BRUSH_H + 8,
+            transform: 'translateX(-18px)'
           }}
           onPointerDown={(e) => onPointerDown(e, 'left')}
         >
-          <div className="bg-primary mx-auto mt-1.5 h-[calc(100%-12px)] w-1 rounded-full" />
+          <div className="bg-primary mx-auto mt-2.5 h-[calc(100%-16px)] w-1.5 rounded-full" />
         </div>
 
         {/* Right handle */}
         <div
-          className="absolute top-0 cursor-col-resize"
+          className="absolute cursor-col-resize"
           style={{
             left: `${(rightX / W) * 100}%`,
-            width: 16,
-            height: BRUSH_H,
-            transform: 'translateX(-8px)'
+            width: 36,
+            top: -4,
+            height: BRUSH_H + 8,
+            transform: 'translateX(-18px)'
           }}
           onPointerDown={(e) => onPointerDown(e, 'right')}
         >
-          <div className="bg-primary mx-auto mt-1.5 h-[calc(100%-12px)] w-1 rounded-full" />
+          <div className="bg-primary mx-auto mt-2.5 h-[calc(100%-16px)] w-1.5 rounded-full" />
         </div>
       </div>
 
