@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'SlopWise - Expense Splitting',
-        short_name: 'SlopWise',
+        name: 'Slopwise - Expense Splitting',
+        short_name: 'Slopwise',
         description: 'Split expenses with friends, powered by Google Sheets',
         theme_color: '#5bc5a7',
         background_color: '#1a1a2e',

@@ -22,7 +22,7 @@ export default function LoginPage() {
           <Receipt className="text-white" size={28} />
         </div>
       </div>
-      <h1 className="text-text-primary mb-1 text-3xl font-bold">SlopWise</h1>
+      <h1 className="text-text-primary mb-1 text-3xl font-bold">Slopwise</h1>
       <p className="text-text-secondary mb-8 max-w-xs text-center">
         Split expenses with friends. All data lives in your Google Sheets.
       </p>

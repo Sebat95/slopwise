@@ -3,8 +3,6 @@ import type { Expense } from '../types';
 import { format, parseISO } from 'date-fns';
 
 const CHART_COLORS = [
-  '#5bc5a7',
-  '#e74c3c',
   '#3498db',
   '#f39c12',
   '#9b59b6',
@@ -12,6 +10,8 @@ const CHART_COLORS = [
   '#e91e63',
   '#00bcd4',
   '#2ecc71',
+  '#5bc5a7',
+  '#e74c3c',
   '#ff6b6b',
   '#4ecdc4',
   '#ffe66d',

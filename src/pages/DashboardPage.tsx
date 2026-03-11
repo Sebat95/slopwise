@@ -188,7 +188,7 @@ export default function DashboardPage() {
                 className="group flex items-center gap-2 text-left"
               >
                 <h1 className="text-text-primary truncate text-xl font-bold">
-                  {spreadsheetName || 'SlopWise'}
+                  {spreadsheetName || 'Slopwise'}
                 </h1>
                 <Pencil
                   size={14}
