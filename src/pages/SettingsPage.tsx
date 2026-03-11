@@ -1,16 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
-import { exportToCSV, downloadCSV, parseCompetitorCSV } from '../utils/csv';
+import { exportToCSV, downloadCSV } from '../utils/csv';
 import {
   LogOut,
   UserPlus,
   Download,
-  Upload,
   FileSpreadsheet,
   ExternalLink,
   Users,
@@ -34,16 +33,21 @@ export default function SettingsPage() {
     addMember,
     renameMember,
     linkMemberToGoogle,
-    importExpenses,
     loadData,
     disconnect,
     isLoading
   } = useApp();
 
+  useEffect(() => {
+    if (members.length === 0 && !isLoading) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [adding, setAdding] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [memberDraft, setMemberDraft] = useState('');
@@ -86,34 +90,6 @@ export default function SettingsPage() {
     const csv = exportToCSV(expenses, members);
     const filename = `${spreadsheetName || 'expenses'}_${new Date().toISOString().split('T')[0]}.csv`;
     downloadCSV(csv, filename);
-  };
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const { members: csvMembers, expenses: csvExpenses } =
-        parseCompetitorCSV(text);
-      if (csvMembers.length === 0) {
-        alert(
-          'Could not parse CSV file. Make sure it matches Competitor export format.'
-        );
-        return;
-      }
-      if (
-        window.confirm(
-          `Import ${csvExpenses.length} expenses with ${csvMembers.length} members?`
-        )
-      ) {
-        await importExpenses(csvExpenses, csvMembers);
-      }
-    } catch {
-      alert('Failed to import CSV file');
-    }
-
-    if (fileRef.current) fileRef.current.value = '';
   };
 
   const handleLogout = () => {
@@ -206,6 +182,11 @@ export default function SettingsPage() {
             </button>
           </div>
           <div className="bg-bg-card border-border/50 divide-border/30 divide-y rounded-xl border">
+            {members.length === 0 && isLoading && (
+              <div className="text-text-muted p-4 text-center text-sm">
+                Loading members...
+              </div>
+            )}
             {members.map((m) => {
               const profile = memberProfiles[m];
               const isEditing = editingMember === m;
@@ -286,44 +267,20 @@ export default function SettingsPage() {
           <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
             Data
           </h2>
-          <div className="space-y-2">
-            <button
-              onClick={handleExport}
-              className="bg-bg-card border-border/50 hover:border-primary/30 flex w-full items-center gap-3 rounded-xl border p-3.5 transition-colors"
-            >
-              <Download size={18} className="text-primary" />
-              <div className="text-left">
-                <p className="text-text-primary text-sm font-medium">
-                  Export CSV
-                </p>
-                <p className="text-text-muted text-xs">
-                  Competitor-compatible format
-                </p>
-              </div>
-            </button>
-
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={handleImportFile}
-            />
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="bg-bg-card border-border/50 hover:border-primary/30 flex w-full items-center gap-3 rounded-xl border p-3.5 transition-colors"
-            >
-              <Upload size={18} className="text-primary" />
-              <div className="text-left">
-                <p className="text-text-primary text-sm font-medium">
-                  Import CSV
-                </p>
-                <p className="text-text-muted text-xs">
-                  Import Competitor CSV export
-                </p>
-              </div>
-            </button>
-          </div>
+          <button
+            onClick={handleExport}
+            className="bg-bg-card border-border/50 hover:border-primary/30 flex w-full items-center gap-3 rounded-xl border p-3.5 transition-colors"
+          >
+            <Download size={18} className="text-primary" />
+            <div className="text-left">
+              <p className="text-text-primary text-sm font-medium">
+                Export CSV
+              </p>
+              <p className="text-text-muted text-xs">
+                Splitwise-compatible format
+              </p>
+            </div>
+          </button>
         </section>
 
         {/* Account */}
