@@ -190,7 +190,10 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     const splitRow = settingsData.values.find(
       (r) => r[0]?.toLowerCase() === 'lastsplittype'
     );
-    if (splitRow?.[1] && ['equal', 'exact', 'percentage', 'shares'].includes(splitRow[1])) {
+    if (
+      splitRow?.[1] &&
+      ['equal', 'exact', 'percentage', 'shares'].includes(splitRow[1])
+    ) {
       lastSplitType = splitRow[1] as import('../types').SplitType;
     }
   }

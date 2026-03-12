@@ -24,7 +24,17 @@ import {
 export default function AddExpensePage() {
   const navigate = useNavigate();
   const { id: editId } = useParams<{ id: string }>();
-  const { members, currency, expenses, lastSplitType, isLoading, loadData, addExpense, updateExpense, setLastSplitType } = useApp();
+  const {
+    members,
+    currency,
+    expenses,
+    lastSplitType,
+    isLoading,
+    loadData,
+    addExpense,
+    updateExpense,
+    setLastSplitType
+  } = useApp();
 
   useEffect(() => {
     if (members.length === 0 && !isLoading) {
