@@ -24,7 +24,14 @@ import {
 export default function AddExpensePage() {
   const navigate = useNavigate();
   const { id: editId } = useParams<{ id: string }>();
-  const { members, currency, expenses, addExpense, updateExpense } = useApp();
+  const { members, currency, expenses, lastSplitType, isLoading, loadData, addExpense, updateExpense, setLastSplitType } = useApp();
+
+  useEffect(() => {
+    if (members.length === 0 && !isLoading) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const existing = useMemo(
     () => (editId ? expenses.find((e) => e.id === editId) : undefined),
@@ -38,7 +45,11 @@ export default function AddExpensePage() {
   const [category, setCategory] = useState('General');
   const [expCurrency, setExpCurrency] = useState(currency);
   const [paidBy, setPaidBy] = useState(members[0] || '');
-  const [splitType, setSplitType] = useState<SplitType>('equal');
+  const [splitType, setSplitTypeLocal] = useState<SplitType>(lastSplitType);
+  const setSplitType = (type: SplitType) => {
+    setSplitTypeLocal(type);
+    setLastSplitType(type);
+  };
   const [splitValues, setSplitValues] = useState<Record<string, number>>({});
   const [involved, setInvolved] = useState<Set<string>>(new Set(members));
   const [saving, setSaving] = useState(false);
@@ -52,7 +63,7 @@ export default function AddExpensePage() {
     setCategory(existing.category);
     setExpCurrency(existing.currency);
     setPaidBy(existing.paidBy);
-    setSplitType(existing.splitType);
+    setSplitTypeLocal(existing.splitType);
 
     const involvedSet = new Set<string>();
     const values: Record<string, number> = {};

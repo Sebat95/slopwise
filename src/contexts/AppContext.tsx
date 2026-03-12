@@ -7,7 +7,7 @@ import {
   useMemo,
   type ReactNode
 } from 'react';
-import type { Expense, MemberInfo } from '../types';
+import type { Expense, MemberInfo, SplitType } from '../types';
 import * as sheetsApi from '../services/sheets-api';
 import { fetchUserProfile } from '../services/google-auth';
 import { v4 as uuidv4 } from 'uuid';
@@ -19,6 +19,7 @@ interface AppState {
   memberProfiles: Record<string, MemberInfo>;
   expenses: Expense[];
   currency: string;
+  lastSplitType: SplitType;
   isLoading: boolean;
   isSyncing: boolean;
   error: string | null;
@@ -43,6 +44,7 @@ interface AppActions {
     newExpenses: Expense[],
     newMembers: string[]
   ) => Promise<void>;
+  setLastSplitType: (type: SplitType) => void;
   disconnect: () => void;
 }
 
@@ -62,6 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     memberProfiles: {},
     expenses: [],
     currency: 'EUR',
+    lastSplitType: 'equal',
     isLoading: false,
     isSyncing: false,
     error: null,
@@ -108,6 +111,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         memberProfiles: profileMap,
         expenses: data.expenses,
         currency: data.currency,
+        lastSplitType: data.lastSplitType,
         isLoading: false,
         lastSync: new Date()
       }));
@@ -477,6 +481,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const setLastSplitType = useCallback((type: SplitType) => {
+    setState((s) => ({ ...s, lastSplitType: type }));
+    const ssId = getSsId();
+    if (ssId) {
+      sheetsApi.saveSetting(ssId, 'lastSplitType', type).catch(() => {});
+    }
+  }, []);
+
   const disconnect = useCallback(() => {
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
@@ -503,6 +515,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       settleUp,
       renameSheet,
       importExpenses,
+      setLastSplitType,
       disconnect
     }),
     [
@@ -517,6 +530,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       settleUp,
       renameSheet,
       importExpenses,
+      setLastSplitType,
       disconnect
     ]
   );

@@ -29,6 +29,7 @@ export interface SheetData {
   members: string[];
   expenses: Expense[];
   currency: string;
+  lastSplitType: SplitType;
 }
 
 export interface GoogleTokenInfo {

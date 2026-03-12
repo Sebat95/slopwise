@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
@@ -16,7 +16,14 @@ import {
 } from 'lucide-react';
 
 export default function BalancesPage() {
-  const { members, expenses, currency } = useApp();
+  const { members, expenses, currency, isLoading, loadData } = useApp();
+
+  useEffect(() => {
+    if (expenses.length === 0 && !isLoading) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { minDate, maxDate } = useMemo(() => {
     if (expenses.length === 0) return { minDate: '', maxDate: '' };

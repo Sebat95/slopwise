@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
@@ -10,7 +10,14 @@ import { getCategoryEmoji, formatCurrency } from '../utils/format';
 
 export default function ExpensesPage() {
   const navigate = useNavigate();
-  const { expenses, currency, deleteExpense } = useApp();
+  const { expenses, currency, isLoading, loadData, deleteExpense } = useApp();
+
+  useEffect(() => {
+    if (expenses.length === 0 && !isLoading) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 

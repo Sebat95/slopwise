@@ -181,15 +181,22 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
   ]);
 
   let currency = 'EUR';
+  let lastSplitType: import('../types').SplitType = 'equal';
   if (settingsData.values) {
     const currRow = settingsData.values.find(
       (r) => r[0]?.toLowerCase() === 'currency'
     );
     if (currRow?.[1]) currency = currRow[1];
+    const splitRow = settingsData.values.find(
+      (r) => r[0]?.toLowerCase() === 'lastsplittype'
+    );
+    if (splitRow?.[1] && ['equal', 'exact', 'percentage', 'shares'].includes(splitRow[1])) {
+      lastSplitType = splitRow[1] as import('../types').SplitType;
+    }
   }
 
   if (!expenseData.values || expenseData.values.length <= 1) {
-    return { members: [], expenses: [], currency };
+    return { members: [], expenses: [], currency, lastSplitType };
   }
 
   const headers = expenseData.values[0];
@@ -229,7 +236,30 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       splits
     });
   }
-  return { members: memberNames, expenses, currency };
+  return { members: memberNames, expenses, currency, lastSplitType };
+}
+
+export async function saveSetting(
+  spreadsheetId: string,
+  key: string,
+  value: string
+): Promise<void> {
+  const data = await apiRequest<{ values?: string[][] }>(
+    `${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B20`
+  ).catch(() => ({ values: undefined }));
+
+  const rows = data.values ? [...data.values] : [];
+  const idx = rows.findIndex((r) => r[0]?.toLowerCase() === key.toLowerCase());
+  if (idx >= 0) {
+    rows[idx] = [rows[idx][0], value];
+  } else {
+    rows.push([key, value]);
+  }
+
+  await apiRequest<unknown>(
+    `${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B${rows.length}?valueInputOption=USER_ENTERED`,
+    { method: 'PUT', body: JSON.stringify({ values: rows }) }
+  );
 }
 
 function expenseToRow(expense: Expense, members: string[]): string[] {
