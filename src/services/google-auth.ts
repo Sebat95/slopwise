@@ -80,6 +80,17 @@ export function isTokenValid(): boolean {
   return getStoredToken() !== null;
 }
 
+export function hasStoredToken(): boolean {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return false;
+    const parsed: unknown = JSON.parse(raw);
+    return isValidToken(parsed);
+  } catch {
+    return false;
+  }
+}
+
 function loadGsiScript(): void {
   if (document.querySelector('script[src*="accounts.google.com/gsi/client"]'))
     return;
