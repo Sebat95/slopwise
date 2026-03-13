@@ -15,7 +15,6 @@ import {
   ChevronLeft,
   Check,
   User,
-  DollarSign,
   Calendar,
   Tag,
   SplitSquareHorizontal
@@ -240,7 +239,7 @@ export default function AddExpensePage() {
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="text-text-secondary mb-1.5 flex items-center gap-1 text-xs font-medium">
-                <DollarSign size={12} /> Amount
+                Amount
               </label>
               <input
                 type="text"
