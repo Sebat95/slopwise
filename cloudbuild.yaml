@@ -37,3 +37,6 @@ steps:
 images:
   - ${_IMAGE}:$SHORT_SHA
   - ${_IMAGE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
