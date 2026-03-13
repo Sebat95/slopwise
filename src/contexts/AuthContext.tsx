@@ -10,7 +10,8 @@ import {
   signIn,
   signOut as authSignOut,
   isTokenValid,
-  getAccessToken
+  getAccessToken,
+  refreshToken
 } from '../services/google-auth';
 
 interface AuthState {
@@ -43,13 +44,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (state.isAuthenticated && !isTokenValid()) {
+    let refreshing = false;
+    const interval = setInterval(async () => {
+      if (!state.isAuthenticated || isTokenValid() || refreshing) return;
+      refreshing = true;
+      try {
+        await refreshToken(state.clientId);
+        setState((s) => ({ ...s, isAuthenticated: true }));
+      } catch {
         setState((s) => ({ ...s, isAuthenticated: false }));
+      } finally {
+        refreshing = false;
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [state.isAuthenticated]);
+  }, [state.isAuthenticated, state.clientId]);
 
   const setClientId = useCallback((id: string) => {
     localStorage.setItem(CLIENT_ID_KEY, id);
