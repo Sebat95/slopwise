@@ -81,6 +81,7 @@ export default function SettingsPage() {
       setShowAddMember(false);
       setNewMemberName('');
     } catch {
+      // ignore
     } finally {
       setAdding(false);
     }

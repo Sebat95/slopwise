@@ -132,6 +132,7 @@ export default function DashboardPage() {
       await settleUp(settleFrom, settleTo, amt);
       setShowSettle(false);
     } catch {
+      // ignore
     } finally {
       setSettling(false);
     }

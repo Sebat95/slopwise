@@ -161,9 +161,7 @@ export async function signIn(clientId: string): Promise<GoogleTokenInfo> {
   });
 }
 
-export async function refreshToken(
-  clientId: string
-): Promise<GoogleTokenInfo> {
+export async function refreshToken(clientId: string): Promise<GoogleTokenInfo> {
   const existing = getStoredToken();
   if (existing) return existing;
 

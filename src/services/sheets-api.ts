@@ -291,8 +291,7 @@ export async function appendExpense(
 export async function writeAllExpenses(
   spreadsheetId: string,
   expenses: Expense[],
-  members: string[],
-  _currency: string
+  members: string[]
 ): Promise<void> {
   const headers = [
     'Date',

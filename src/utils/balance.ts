@@ -69,7 +69,7 @@ export function calculateSplits(
 
   for (const m of members) splits[m] = 0;
 
-  let shares: Record<string, number> = {};
+  const shares: Record<string, number> = {};
 
   switch (splitType) {
     case 'equal': {

@@ -457,12 +457,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const allMembers = [...new Set([...current.members, ...newMembers])];
         const allExpenses = [...current.expenses, ...newExpenses];
 
-        await sheetsApi.writeAllExpenses(
-          ssId,
-          allExpenses,
-          allMembers,
-          current.currency
-        );
+        await sheetsApi.writeAllExpenses(ssId, allExpenses, allMembers);
         setState((s) => ({
           ...s,
           members: allMembers,
