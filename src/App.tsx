@@ -8,9 +8,11 @@ import ExpensesPage from './pages/ExpensesPage';
 import AddExpensePage from './pages/AddExpensePage';
 import BalancesPage from './pages/BalancesPage';
 import SettingsPage from './pages/SettingsPage';
+import LoadingSpinner from './components/LoadingSpinner';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <LoadingSpinner text="Signing in..." />;
   if (!isAuthenticated) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
@@ -22,7 +24,7 @@ function SheetGuard({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const { spreadsheetId } = useApp();
 
   return (
@@ -30,7 +32,9 @@ function AppRoutes() {
       <Route
         path="/"
         element={
-          isAuthenticated ? (
+          isLoading ? (
+            <LoadingSpinner text="Signing in..." />
+          ) : isAuthenticated ? (
             spreadsheetId ? (
               <Navigate to="/dashboard" replace />
             ) : (

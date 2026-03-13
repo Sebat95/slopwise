@@ -10,7 +10,9 @@ import {
   signIn,
   signOut as authSignOut,
   isTokenValid,
-  getAccessToken
+  getAccessToken,
+  refreshToken,
+  hasStoredToken
 } from '../services/google-auth';
 
 interface AuthState {
@@ -31,25 +33,56 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const CLIENT_ID_KEY = 'slopwise_client_id';
 
+function getInitialClientId(): string {
+  return (
+    localStorage.getItem(CLIENT_ID_KEY) ||
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    ''
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const clientId = getInitialClientId();
+  const canRefresh = !isTokenValid() && hasStoredToken() && !!clientId;
+
   const [state, setState] = useState<AuthState>({
     isAuthenticated: isTokenValid(),
-    isLoading: false,
+    isLoading: canRefresh,
     error: null,
-    clientId:
-      localStorage.getItem(CLIENT_ID_KEY) ||
-      import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-      ''
+    clientId
   });
 
+  // On mount: if token expired but exists, try silent refresh
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (state.isAuthenticated && !isTokenValid()) {
+    if (!canRefresh) return;
+
+    refreshToken(clientId)
+      .then(() => {
+        setState((s) => ({ ...s, isAuthenticated: true, isLoading: false }));
+      })
+      .catch(() => {
+        setState((s) => ({ ...s, isAuthenticated: false, isLoading: false }));
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Periodic check: silently refresh when token expires while app is open
+  useEffect(() => {
+    let refreshing = false;
+    const interval = setInterval(async () => {
+      if (!state.isAuthenticated || isTokenValid() || refreshing) return;
+      refreshing = true;
+      try {
+        await refreshToken(state.clientId);
+        setState((s) => ({ ...s, isAuthenticated: true }));
+      } catch {
         setState((s) => ({ ...s, isAuthenticated: false }));
+      } finally {
+        refreshing = false;
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [state.isAuthenticated]);
+  }, [state.isAuthenticated, state.clientId]);
 
   const setClientId = useCallback((id: string) => {
     localStorage.setItem(CLIENT_ID_KEY, id);

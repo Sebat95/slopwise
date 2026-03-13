@@ -80,6 +80,17 @@ export function isTokenValid(): boolean {
   return getStoredToken() !== null;
 }
 
+export function hasStoredToken(): boolean {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return false;
+    const parsed: unknown = JSON.parse(raw);
+    return isValidToken(parsed);
+  } catch {
+    return false;
+  }
+}
+
 function loadGsiScript(): void {
   if (document.querySelector('script[src*="accounts.google.com/gsi/client"]'))
     return;
@@ -150,10 +161,42 @@ export async function signIn(clientId: string): Promise<GoogleTokenInfo> {
   });
 }
 
-export async function refreshToken(clientId: string): Promise<GoogleTokenInfo> {
+export async function refreshToken(
+  clientId: string
+): Promise<GoogleTokenInfo> {
   const existing = getStoredToken();
   if (existing) return existing;
-  return signIn(clientId);
+
+  await waitForGoogleScript();
+  const gsi = window.google?.accounts?.oauth2;
+  if (!gsi) throw new Error('Google Identity Services not available');
+
+  return new Promise((resolve, reject) => {
+    const tokenClient = gsi.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: (response) => {
+        if (response.error) {
+          reject(new Error(response.error));
+          return;
+        }
+        const tokenInfo: GoogleTokenInfo = {
+          access_token: response.access_token,
+          expires_in: response.expires_in,
+          token_type: response.token_type,
+          scope: response.scope,
+          expiry_time: Date.now() + response.expires_in * 1000 - 60000
+        };
+        storeToken(tokenInfo);
+        resolve(tokenInfo);
+      },
+      error_callback: (error) => {
+        reject(new Error(error.message || 'Token refresh failed'));
+      }
+    });
+
+    tokenClient.requestAccessToken({ prompt: '' });
+  });
 }
 
 export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
