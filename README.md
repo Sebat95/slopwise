@@ -1,28 +1,23 @@
 # Slopwise — Expense tracking Clone Powered by Google Sheets
 A fully functional, mobile-first PWA for splitting expenses with friends. All data is stored in your own Google Sheets — no server, no database, fully stateless.
 
-<font color="green">
-
-## Preface
-
-I have always wanted to try "vibecoding" an app from scratch, so here I am! I used Cursor to test several competing models:
-- **GPT-5.3-Codex**
-- **Composer-1.5**
-- **Claude-4.6-Opus-High-Thinking**
-- **Gemini-3.1-Pro**
-- **Kimi-K2.5**
-
-Each one was tasked with building a clone of a major expense-tracking app, plus everything had to be saved to a Google Sheet with seamless interoperability for CSVs from the original app.
-
-After burning through some tokens, I had Claude 4.6 shortlist the three best versions, and I picked the one that felt right to iterate on.
-From there, I stuck with Claude to refine the product and add features since it was the fastest way to ship.
-I have since deployed it to Cloud Run and ironed out a few minor bugs.
-
-I am pretty proud of the result! It is now my daily driver for expense tracking, and I will be "vibing out" any new feature or fix as they come up.
-
-Well, I leave you now to the rest of the generated README.md
-
-</font>
+> [!IMPORTANT]
+> I have always wanted to try "vibecoding" an app from scratch, so here I am! I used Cursor to test several competing models:
+> - **GPT-5.3-Codex**
+> - **Composer-1.5**
+> - **Claude-4.6-Opus-High-Thinking**
+> - **Gemini-3.1-Pro**
+> - **Kimi-K2.5**
+>
+> Each one was tasked with building a clone of a major expense-tracking app, plus everything had to be saved to a Google Sheet with seamless interoperability for CSVs from the original app.
+>
+> After burning through some tokens, I had Claude 4.6 shortlist the three best versions, and I picked the one that felt right to iterate on.
+> From there, I stuck with Claude to refine the product and add features since it was the fastest way to ship.
+> I have since deployed it to Cloud Run and ironed out a few minor bugs.
+>
+> I am pretty proud of the result! It is now my daily driver for expense tracking, and I will be "vibing out" any new feature or fix as they come up.
+>
+> Well, I leave you now to the rest of the generated README.md
 
 
 ## Features
