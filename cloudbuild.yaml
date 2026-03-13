@@ -1,0 +1,44 @@
+substitutions:
+  _REGION: europe-west1
+  _SERVICE: slopwise-run
+  _IMAGE: europe-west1-docker.pkg.dev/slopwise-auth/cloud-run-source-deploy/slopwise/slopwise-run
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/slopwise-auth/secrets/VITE_GOOGLE_CLIENT_ID/versions/latest
+      env: VITE_GOOGLE_CLIENT_ID
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker build \
+          --build-arg VITE_GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID \
+          -t ${_IMAGE}:$SHORT_SHA \
+          -t ${_IMAGE}:latest \
+          .
+    secretEnv:
+      - VITE_GOOGLE_CLIENT_ID
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_IMAGE}
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+
+images:
+  - ${_IMAGE}:$SHORT_SHA
+  - ${_IMAGE}:latest
