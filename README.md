@@ -1,7 +1,7 @@
 # Slopwise — Expense tracking Clone Powered by Google Sheets
 A fully functional, mobile-first PWA for splitting expenses with friends. All data is stored in your own Google Sheets — no server, no database, fully stateless.
 
-<span style="color: green">
+<font color="green">
 
 ## Preface
 
@@ -22,7 +22,7 @@ I am pretty proud of the result! It is now my daily driver for expense tracking,
 
 Well, I leave you now to the rest of the generated README.md
 
-</span>
+</font>
 
 
 ## Features
