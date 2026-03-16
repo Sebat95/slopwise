@@ -198,8 +198,16 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     }
   }
 
+  let lastPaidBy = '';
+  if (settingsData.values) {
+    const paidRow = settingsData.values.find(
+      (r) => r[0]?.toLowerCase() === 'lastpaidby'
+    );
+    if (paidRow?.[1]) lastPaidBy = paidRow[1];
+  }
+
   if (!expenseData.values || expenseData.values.length <= 1) {
-    return { members: [], expenses: [], currency, lastSplitType };
+    return { members: [], expenses: [], currency, lastSplitType, lastPaidBy };
   }
 
   const headers = expenseData.values[0];
@@ -239,7 +247,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       splits
     });
   }
-  return { members: memberNames, expenses, currency, lastSplitType };
+  return { members: memberNames, expenses, currency, lastSplitType, lastPaidBy };
 }
 
 export async function saveSetting(

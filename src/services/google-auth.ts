@@ -54,7 +54,6 @@ function getStoredToken(): GoogleTokenInfo | null {
       return null;
     }
     if (Date.now() >= parsed.expiry_time) {
-      localStorage.removeItem(SESSION_KEY);
       return null;
     }
     return parsed;
