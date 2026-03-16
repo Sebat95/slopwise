@@ -247,7 +247,13 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       splits
     });
   }
-  return { members: memberNames, expenses, currency, lastSplitType, lastPaidBy };
+  return {
+    members: memberNames,
+    expenses,
+    currency,
+    lastSplitType,
+    lastPaidBy
+  };
 }
 
 export async function saveSetting(

@@ -1,8 +1,10 @@
 # Slopwise — Expense tracking Clone Powered by Google Sheets
+
 A fully functional, mobile-first PWA for splitting expenses with friends. All data is stored in your own Google Sheets — no server, no database, fully stateless.
 
 > [!IMPORTANT]
 > I have always wanted to try "vibecoding" an app from scratch, so here I am! I used Cursor to test several competing models:
+>
 > - **GPT-5.3-Codex**
 > - **Composer-1.5**
 > - **Claude-4.6-Opus-High-Thinking**
@@ -18,7 +20,6 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 > I am pretty proud of the result! It is now my daily driver for expense tracking, and I will be "vibing out" any new feature or fix as they come up.
 >
 > Well, I leave you now to the rest of the generated README.md
-
 
 ## Features
 
