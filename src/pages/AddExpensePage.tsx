@@ -28,11 +28,13 @@ export default function AddExpensePage() {
     currency,
     expenses,
     lastSplitType,
+    lastPaidBy,
     isLoading,
     loadData,
     addExpense,
     updateExpense,
-    setLastSplitType
+    setLastSplitType,
+    setLastPaidBy
   } = useApp();
 
   useEffect(() => {
@@ -53,7 +55,13 @@ export default function AddExpensePage() {
   const [date, setDate] = useState(todayStr());
   const [category, setCategory] = useState('General');
   const [expCurrency, setExpCurrency] = useState(currency);
-  const [paidBy, setPaidBy] = useState(members[0] || '');
+  const [paidBy, setPaidByLocal] = useState(
+    lastPaidBy && members.includes(lastPaidBy) ? lastPaidBy : members[0] || ''
+  );
+  const setPaidBy = (name: string) => {
+    setPaidByLocal(name);
+    if (!isEdit) setLastPaidBy(name);
+  };
   const [splitType, setSplitTypeLocal] = useState<SplitType>(lastSplitType);
   const setSplitType = (type: SplitType) => {
     setSplitTypeLocal(type);
@@ -71,7 +79,7 @@ export default function AddExpensePage() {
     setDate(existing.date);
     setCategory(existing.category);
     setExpCurrency(existing.currency);
-    setPaidBy(existing.paidBy);
+    setPaidByLocal(existing.paidBy);
     setSplitTypeLocal(existing.splitType);
 
     const involvedSet = new Set<string>();

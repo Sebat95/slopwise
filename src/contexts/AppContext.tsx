@@ -20,6 +20,7 @@ interface AppState {
   expenses: Expense[];
   currency: string;
   lastSplitType: SplitType;
+  lastPaidBy: string;
   isLoading: boolean;
   isSyncing: boolean;
   error: string | null;
@@ -45,6 +46,7 @@ interface AppActions {
     newMembers: string[]
   ) => Promise<void>;
   setLastSplitType: (type: SplitType) => void;
+  setLastPaidBy: (name: string) => void;
   disconnect: () => void;
 }
 
@@ -65,6 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     expenses: [],
     currency: 'EUR',
     lastSplitType: 'equal',
+    lastPaidBy: '',
     isLoading: false,
     isSyncing: false,
     error: null,
@@ -112,6 +115,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         expenses: data.expenses,
         currency: data.currency,
         lastSplitType: data.lastSplitType,
+        lastPaidBy: data.lastPaidBy,
         isLoading: false,
         lastSync: new Date()
       }));
@@ -489,6 +493,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setLastPaidBy = useCallback((name: string) => {
+    setState((s) => ({ ...s, lastPaidBy: name }));
+    const ssId = getSsId();
+    if (ssId) {
+      sheetsApi.saveSetting(ssId, 'lastPaidBy', name).catch(() => {});
+    }
+  }, []);
+
   const disconnect = useCallback(() => {
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
@@ -516,6 +528,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       renameSheet,
       importExpenses,
       setLastSplitType,
+      setLastPaidBy,
       disconnect
     }),
     [
@@ -531,6 +544,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       renameSheet,
       importExpenses,
       setLastSplitType,
+      setLastPaidBy,
       disconnect
     ]
   );

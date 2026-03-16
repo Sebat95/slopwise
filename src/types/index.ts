@@ -30,6 +30,7 @@ export interface SheetData {
   expenses: Expense[];
   currency: string;
   lastSplitType: SplitType;
+  lastPaidBy: string;
 }
 
 export interface GoogleTokenInfo {
