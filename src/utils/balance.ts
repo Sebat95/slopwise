@@ -13,6 +13,10 @@ export function calculateNetBalances(
     }
   }
 
+  for (const m of members) {
+    balances[m] = Math.round(balances[m] * 100) / 100;
+  }
+
   return balances;
 }
 
@@ -103,6 +107,12 @@ export function calculateSplits(
     const paid = m === paidBy ? cost : 0;
     const owes = shares[m] ?? 0;
     splits[m] = Math.round((paid - owes) * 100) / 100;
+  }
+
+  // Ensure splits sum to exactly zero (fix floating-point rounding drift)
+  const sum = Object.values(splits).reduce((a, b) => a + b, 0);
+  if (Math.abs(sum) > 0 && Math.abs(sum) < 0.1) {
+    splits[paidBy] = Math.round((splits[paidBy] - sum) * 100) / 100;
   }
 
   return splits;
