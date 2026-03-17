@@ -1,9 +1,47 @@
 import { format, parseISO, isValid } from 'date-fns';
 
+export function parseLooseNumber(
+  value: string | number | null | undefined
+): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (value == null) return 0;
+
+  const raw = String(value).trim();
+  if (!raw) return 0;
+
+  const isNegativeByParens = raw.startsWith('(') && raw.endsWith(')');
+  let cleaned = raw
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[^0-9,.\-+]/g, '');
+  if (!cleaned) return 0;
+
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+  const commaThousandsPattern = /^\d{1,3}(,\d{3})+$/;
+  const dotThousandsPattern = /^\d{1,3}(\.\d{3})+$/;
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    const decimalSep = lastComma > lastDot ? ',' : '.';
+    const thousandsSep = decimalSep === ',' ? '.' : ',';
+    cleaned = cleaned.split(thousandsSep).join('');
+    if (decimalSep === ',') cleaned = cleaned.replace(',', '.');
+  } else if (lastComma >= 0) {
+    cleaned = commaThousandsPattern.test(cleaned)
+      ? cleaned.split(',').join('')
+      : cleaned.replace(',', '.');
+  } else if (lastDot >= 0 && dotThousandsPattern.test(cleaned)) {
+    cleaned = cleaned.split('.').join('');
+  }
+
+  const parsed = parseFloat(cleaned);
+  if (!Number.isFinite(parsed)) return 0;
+  return isNegativeByParens ? -parsed : parsed;
+}
+
 export function parseAmount(input: string): number {
-  const cleaned = input.replace(/,/g, '.');
-  const val = parseFloat(cleaned);
-  if (isNaN(val)) return 0;
+  const val = parseLooseNumber(input);
+  if (!Number.isFinite(val)) return 0;
   return Math.round(val * 100) / 100;
 }
 

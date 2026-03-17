@@ -1,5 +1,6 @@
 import type { Expense } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { parseLooseNumber } from './format';
 
 export function parseCompetitorCSV(csvText: string): {
   members: string[];
@@ -36,7 +37,7 @@ export function parseCompetitorCSV(csvText: string): {
     const date = cols[0]?.trim() || '';
     const description = cols[1]?.trim() || '';
     const category = cols[2]?.trim() || 'General';
-    const cost = parseFloat(cols[3]?.trim() || '0') || 0;
+    const cost = parseLooseNumber(cols[3]?.trim() || '0');
     const currency = cols[4]?.trim() || 'USD';
 
     if (!date || cost === 0) continue;
@@ -46,7 +47,7 @@ export function parseCompetitorCSV(csvText: string): {
     let maxPositive = -Infinity;
 
     for (let j = 0; j < members.length; j++) {
-      const val = parseFloat(cols[memberStartIdx + j]?.trim() || '0') || 0;
+      const val = parseLooseNumber(cols[memberStartIdx + j]?.trim() || '0');
       splits[members[j]] = val;
       if (val > maxPositive) {
         maxPositive = val;

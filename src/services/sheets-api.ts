@@ -1,7 +1,7 @@
 import type { SpreadsheetInfo, Expense, SheetData, MemberInfo } from '../types';
 import { FIXED_COLUMNS } from '../types';
 import { getAccessToken } from './google-auth';
-import { normalizeCategory } from '../utils/format';
+import { normalizeCategory, parseLooseNumber } from '../utils/format';
 import { v4 as uuidv4 } from 'uuid';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -211,7 +211,14 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
   }
 
   const headers = expenseData.values[0];
-  const memberNames = headers.slice(FIXED_COLUMNS);
+  const memberColumns = headers
+    .slice(FIXED_COLUMNS)
+    .map((name, idx) => ({
+      name: (name || '').trim(),
+      colIndex: FIXED_COLUMNS + idx
+    }))
+    .filter((c) => c.name.length > 0);
+  const memberNames = memberColumns.map((c) => c.name);
   const expenses: Expense[] = [];
 
   for (let i = 1; i < expenseData.values.length; i++) {
@@ -222,12 +229,12 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     let paidBy = '';
     let maxPositive = -Infinity;
 
-    for (let j = 0; j < memberNames.length; j++) {
-      const val = parseFloat(row[FIXED_COLUMNS + j] || '0');
-      splits[memberNames[j]] = Math.round(val * 100) / 100;
+    for (const memberColumn of memberColumns) {
+      const val = parseLooseNumber(row[memberColumn.colIndex] || '0');
+      splits[memberColumn.name] = Math.round(val * 100) / 100;
       if (val > maxPositive) {
         maxPositive = val;
-        paidBy = memberNames[j];
+        paidBy = memberColumn.name;
       }
     }
 
@@ -237,7 +244,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       splits[paidBy] = Math.round((splits[paidBy] - splitSum) * 100) / 100;
     }
 
-    const cost = parseFloat(row[3] || '0');
+    const cost = parseLooseNumber(row[3] || '0');
     const category = normalizeCategory(row[2] || 'General');
     const expCurrency = row[4] || currency;
 
