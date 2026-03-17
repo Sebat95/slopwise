@@ -231,9 +231,11 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       }
     }
 
-    // Fix rounding drift: ensure splits sum to zero
-    const splitSum = Object.values(splits).reduce((a, b) => a + b, 0);
-    if (paidBy && Math.abs(splitSum) > 0 && Math.abs(splitSum) < 0.1) {
+    // Force splits to sum to exactly zero — absorb any imbalance into payer
+    const splitSum = Math.round(
+      Object.values(splits).reduce((a, b) => a + b, 0) * 100
+    ) / 100;
+    if (paidBy && splitSum !== 0) {
       splits[paidBy] = Math.round((splits[paidBy] - splitSum) * 100) / 100;
     }
 
