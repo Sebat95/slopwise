@@ -3988,7 +3988,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"firebase@npm:^12.10.0":
+"firebase@npm:12.10.0":
   version: 12.10.0
   resolution: "firebase@npm:12.10.0"
   dependencies:
@@ -6094,7 +6094,7 @@ __metadata:
     eslint: "npm:9.39.1"
     eslint-plugin-react-hooks: "npm:7.0.1"
     eslint-plugin-react-refresh: "npm:0.4.24"
-    firebase: "npm:^12.10.0"
+    firebase: "npm:12.10.0"
     globals: "npm:16.5.0"
     lucide-react: "npm:0.577.0"
     prettier: "npm:3.8.1"
