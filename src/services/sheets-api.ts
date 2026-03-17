@@ -1,4 +1,11 @@
-import type { SpreadsheetInfo, Expense, SheetData, MemberInfo } from '../types';
+import type {
+  SpreadsheetInfo,
+  Expense,
+  SheetData,
+  MemberInfo,
+  SplitType,
+  SplitValuePresets
+} from '../types';
 import { FIXED_COLUMNS } from '../types';
 import { getAccessToken } from './google-auth';
 import { normalizeCategory, parseLooseNumber } from '../utils/format';
@@ -7,6 +14,42 @@ import { v4 as uuidv4 } from 'uuid';
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const MAX_ROWS = 10000;
+const SPLIT_TYPES: SplitType[] = ['equal', 'exact', 'percentage', 'shares'];
+
+function emptySplitValuePresets(): SplitValuePresets {
+  return { equal: {}, exact: {}, percentage: {}, shares: {} };
+}
+
+function parseSplitValuePresets(raw: string | undefined): SplitValuePresets {
+  const defaults = emptySplitValuePresets();
+  if (!raw) return defaults;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return defaults;
+
+    const result = emptySplitValuePresets();
+    for (const type of SPLIT_TYPES) {
+      const typeValues = (parsed as Record<string, unknown>)[type];
+      if (!typeValues || typeof typeValues !== 'object') continue;
+
+      for (const [member, value] of Object.entries(
+        typeValues as Record<string, unknown>
+      )) {
+        if (
+          !member.trim() ||
+          typeof value !== 'number' ||
+          !Number.isFinite(value)
+        )
+          continue;
+        result[type][member.trim()] = value;
+      }
+    }
+    return result;
+  } catch {
+    return defaults;
+  }
+}
 
 function columnLetter(index: number): string {
   let result = '';
@@ -181,7 +224,8 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
   ]);
 
   let currency = 'EUR';
-  let lastSplitType: import('../types').SplitType = 'equal';
+  let lastSplitType: SplitType = 'equal';
+  let lastSplitValuePresets: SplitValuePresets = emptySplitValuePresets();
   if (settingsData.values) {
     const currRow = settingsData.values.find(
       (r) => r[0]?.toLowerCase() === 'currency'
@@ -194,8 +238,12 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       splitRow?.[1] &&
       ['equal', 'exact', 'percentage', 'shares'].includes(splitRow[1])
     ) {
-      lastSplitType = splitRow[1] as import('../types').SplitType;
+      lastSplitType = splitRow[1] as SplitType;
     }
+    const valuesRow = settingsData.values.find(
+      (r) => r[0]?.toLowerCase() === 'lastsplitvaluepresets'
+    );
+    lastSplitValuePresets = parseSplitValuePresets(valuesRow?.[1]);
   }
 
   let lastPaidBy = '';
@@ -207,7 +255,14 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
   }
 
   if (!expenseData.values || expenseData.values.length <= 1) {
-    return { members: [], expenses: [], currency, lastSplitType, lastPaidBy };
+    return {
+      members: [],
+      expenses: [],
+      currency,
+      lastSplitType,
+      lastPaidBy,
+      lastSplitValuePresets
+    };
   }
 
   const headers = expenseData.values[0];
@@ -238,9 +293,10 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       }
     }
 
-    // Fix rounding drift: ensure splits sum to zero
-    const splitSum = Object.values(splits).reduce((a, b) => a + b, 0);
-    if (paidBy && Math.abs(splitSum) > 0 && Math.abs(splitSum) < 0.1) {
+    // Force splits to sum to exactly zero — absorb any imbalance into payer
+    const splitSum =
+      Math.round(Object.values(splits).reduce((a, b) => a + b, 0) * 100) / 100;
+    if (paidBy && splitSum !== 0) {
       splits[paidBy] = Math.round((splits[paidBy] - splitSum) * 100) / 100;
     }
 
@@ -265,7 +321,8 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     expenses,
     currency,
     lastSplitType,
-    lastPaidBy
+    lastPaidBy,
+    lastSplitValuePresets
   };
 }
 

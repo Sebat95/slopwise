@@ -1,4 +1,5 @@
 export type SplitType = 'equal' | 'exact' | 'percentage' | 'shares';
+export type SplitValuePresets = Record<SplitType, Record<string, number>>;
 
 export interface Expense {
   id: string;
@@ -31,6 +32,7 @@ export interface SheetData {
   currency: string;
   lastSplitType: SplitType;
   lastPaidBy: string;
+  lastSplitValuePresets: SplitValuePresets;
 }
 
 export interface GoogleTokenInfo {
