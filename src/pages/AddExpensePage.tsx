@@ -34,7 +34,9 @@ export default function AddExpensePage() {
     addExpense,
     updateExpense,
     setLastSplitType,
-    setLastPaidBy
+    setLastPaidBy,
+    lastSplitValuePresets,
+    setLastSplitValuesForType
   } = useApp();
 
   useEffect(() => {
@@ -66,8 +68,13 @@ export default function AddExpensePage() {
   const setSplitType = (type: SplitType) => {
     setSplitTypeLocal(type);
     setLastSplitType(type);
+    if (!isEdit) {
+      setSplitValues(lastSplitValuePresets[type] || {});
+    }
   };
-  const [splitValues, setSplitValues] = useState<Record<string, number>>({});
+  const [splitValues, setSplitValues] = useState<Record<string, number>>(
+    () => lastSplitValuePresets[lastSplitType] || {}
+  );
   const [involved, setInvolved] = useState<Set<string>>(new Set(members));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +113,12 @@ export default function AddExpensePage() {
       setSplitValues(values);
     }
   }, [existing]);
+
+  useEffect(() => {
+    if (isEdit) return;
+    setSplitTypeLocal(lastSplitType);
+    setSplitValues(lastSplitValuePresets[lastSplitType] || {});
+  }, [isEdit, lastSplitType, lastSplitValuePresets]);
 
   const cost = parseAmount(amount);
 
@@ -170,6 +183,9 @@ export default function AddExpensePage() {
     setSaving(true);
 
     try {
+      if (!isEdit) {
+        setLastSplitValuesForType(splitType, splitValues);
+      }
       const splits = calculateSplits(
         cost,
         paidBy,

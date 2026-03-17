@@ -110,9 +110,8 @@ export function calculateSplits(
   }
 
   // Force splits to sum to exactly zero — absorb any rounding into payer
-  const sum = Math.round(
-    Object.values(splits).reduce((a, b) => a + b, 0) * 100
-  ) / 100;
+  const sum =
+    Math.round(Object.values(splits).reduce((a, b) => a + b, 0) * 100) / 100;
   if (sum !== 0) {
     splits[paidBy] = Math.round((splits[paidBy] - sum) * 100) / 100;
   }

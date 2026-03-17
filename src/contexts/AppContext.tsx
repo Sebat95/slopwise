@@ -7,7 +7,12 @@ import {
   useMemo,
   type ReactNode
 } from 'react';
-import type { Expense, MemberInfo, SplitType } from '../types';
+import type {
+  Expense,
+  MemberInfo,
+  SplitType,
+  SplitValuePresets
+} from '../types';
 import * as sheetsApi from '../services/sheets-api';
 import { fetchUserProfile } from '../services/google-auth';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,6 +26,7 @@ interface AppState {
   currency: string;
   lastSplitType: SplitType;
   lastPaidBy: string;
+  lastSplitValuePresets: SplitValuePresets;
   isLoading: boolean;
   isSyncing: boolean;
   error: string | null;
@@ -47,6 +53,10 @@ interface AppActions {
   ) => Promise<void>;
   setLastSplitType: (type: SplitType) => void;
   setLastPaidBy: (name: string) => void;
+  setLastSplitValuesForType: (
+    type: SplitType,
+    values: Record<string, number>
+  ) => void;
   disconnect: () => void;
 }
 
@@ -56,6 +66,10 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 function getSsId(): string | null {
   return localStorage.getItem('slopwise_spreadsheet_id');
+}
+
+function emptySplitValuePresets(): SplitValuePresets {
+  return { equal: {}, exact: {}, percentage: {}, shares: {} };
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -68,6 +82,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currency: 'EUR',
     lastSplitType: 'equal',
     lastPaidBy: '',
+    lastSplitValuePresets: emptySplitValuePresets(),
     isLoading: false,
     isSyncing: false,
     error: null,
@@ -116,6 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currency: data.currency,
         lastSplitType: data.lastSplitType,
         lastPaidBy: data.lastPaidBy,
+        lastSplitValuePresets: data.lastSplitValuePresets,
         isLoading: false,
         lastSync: new Date()
       }));
@@ -496,6 +512,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setLastSplitValuesForType = useCallback(
+    (type: SplitType, values: Record<string, number>) => {
+      const sanitized: Record<string, number> = {};
+      for (const [member, value] of Object.entries(values)) {
+        const trimmed = member.trim();
+        if (!trimmed || !Number.isFinite(value)) continue;
+        sanitized[trimmed] = value;
+      }
+
+      setState((s) => {
+        const next = {
+          ...s.lastSplitValuePresets,
+          [type]: sanitized
+        };
+        const ssId = getSsId();
+        if (ssId) {
+          sheetsApi
+            .saveSetting(ssId, 'lastSplitValuePresets', JSON.stringify(next))
+            .catch(() => {});
+        }
+        return { ...s, lastSplitValuePresets: next };
+      });
+    },
+    []
+  );
+
   const disconnect = useCallback(() => {
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
@@ -524,6 +566,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importExpenses,
       setLastSplitType,
       setLastPaidBy,
+      setLastSplitValuesForType,
       disconnect
     }),
     [
@@ -540,6 +583,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importExpenses,
       setLastSplitType,
       setLastPaidBy,
+      setLastSplitValuesForType,
       disconnect
     ]
   );
