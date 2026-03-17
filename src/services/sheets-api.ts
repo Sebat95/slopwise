@@ -224,11 +224,17 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
 
     for (let j = 0; j < memberNames.length; j++) {
       const val = parseFloat(row[FIXED_COLUMNS + j] || '0');
-      splits[memberNames[j]] = val;
+      splits[memberNames[j]] = Math.round(val * 100) / 100;
       if (val > maxPositive) {
         maxPositive = val;
         paidBy = memberNames[j];
       }
+    }
+
+    // Fix rounding drift: ensure splits sum to zero
+    const splitSum = Object.values(splits).reduce((a, b) => a + b, 0);
+    if (paidBy && Math.abs(splitSum) > 0 && Math.abs(splitSum) < 0.1) {
+      splits[paidBy] = Math.round((splits[paidBy] - splitSum) * 100) / 100;
     }
 
     const cost = parseFloat(row[3] || '0');
