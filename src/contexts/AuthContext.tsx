@@ -11,116 +11,88 @@ import {
   signOut as authSignOut,
   isTokenValid,
   getAccessToken,
-  refreshToken,
-  hasStoredToken
+  refreshToken
 } from '../services/google-auth';
+import { auth } from '../services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  clientId: string;
 }
 
 interface AuthContextValue extends AuthState {
-  setClientId: (id: string) => void;
   login: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   accessToken: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const CLIENT_ID_KEY = 'slopwise_client_id';
-
-function getInitialClientId(): string {
-  return (
-    localStorage.getItem(CLIENT_ID_KEY) ||
-    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-    ''
-  );
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const clientId = getInitialClientId();
-  const canRefresh = !isTokenValid() && hasStoredToken() && !!clientId;
-
   const [state, setState] = useState<AuthState>({
     isAuthenticated: isTokenValid(),
-    isLoading: canRefresh,
-    error: null,
-    clientId
+    isLoading: true, // Start loading to check Firebase state
+    error: null
   });
 
-  // Hint to Android/Chrome that this app should keep storage data.
+  // Listen to Firebase Auth state
   useEffect(() => {
-    if (!('storage' in navigator) || !navigator.storage?.persist) return;
-    navigator.storage.persist().catch(() => {
-      // Ignore: persistence is best-effort and can be denied by the browser.
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is logged into Firebase. 
+        // We still need to check if the Google Access Token for Sheets API is valid.
+        if (isTokenValid()) {
+          setState({ isAuthenticated: true, isLoading: false, error: null });
+        } else {
+          // Token expired, but user is known. Try to refresh or prompt.
+          refreshToken()
+            .then(() => {
+              setState({ isAuthenticated: true, isLoading: false, error: null });
+            })
+            .catch(() => {
+              // Silent refresh failed (common in PWAs). User needs to interact.
+              setState({ isAuthenticated: false, isLoading: false, error: null });
+            });
+        }
+      } else {
+        // No Firebase user
+        setState({ isAuthenticated: false, isLoading: false, error: null });
+      }
     });
+
+    return () => unsubscribe();
   }, []);
 
-  // On mount: if token expired but exists, try silent refresh
+  // Periodic check: if token expires while app is open, we can't silently refresh 
+  // easily in a PWA with Firebase without user interaction, but we can update state.
   useEffect(() => {
-    if (!canRefresh) return;
-
-    refreshToken(clientId)
-      .then(() => {
-        setState((s) => ({ ...s, isAuthenticated: true, isLoading: false }));
-      })
-      .catch(() => {
-        setState((s) => ({ ...s, isAuthenticated: false, isLoading: false }));
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Periodic check: silently refresh when token expires while app is open
-  useEffect(() => {
-    let refreshing = false;
-    const interval = setInterval(async () => {
-      if (!state.isAuthenticated || isTokenValid() || refreshing) return;
-      refreshing = true;
-      try {
-        await refreshToken(state.clientId);
-        setState((s) => ({ ...s, isAuthenticated: true }));
-      } catch {
+    const interval = setInterval(() => {
+      if (state.isAuthenticated && !isTokenValid()) {
         setState((s) => ({ ...s, isAuthenticated: false }));
-      } finally {
-        refreshing = false;
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [state.isAuthenticated, state.clientId]);
-
-  const setClientId = useCallback((id: string) => {
-    localStorage.setItem(CLIENT_ID_KEY, id);
-    setState((s) => ({ ...s, clientId: id }));
-  }, []);
+  }, [state.isAuthenticated]);
 
   const login = useCallback(async () => {
-    if (!state.clientId) {
-      setState((s) => ({
-        ...s,
-        error: 'Please enter a Google OAuth Client ID'
-      }));
-      return;
-    }
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
-      await signIn(state.clientId);
-      setState((s) => ({ ...s, isAuthenticated: true, isLoading: false }));
+      await signIn();
+      setState({ isAuthenticated: true, isLoading: false, error: null });
     } catch (err) {
-      setState((s) => ({
-        ...s,
+      setState({
+        isAuthenticated: false,
         isLoading: false,
         error: err instanceof Error ? err.message : 'Sign-in failed'
-      }));
+      });
     }
-  }, [state.clientId]);
+  }, []);
 
-  const logout = useCallback(() => {
-    authSignOut();
-    setState((s) => ({ ...s, isAuthenticated: false }));
+  const logout = useCallback(async () => {
+    await authSignOut();
+    setState({ isAuthenticated: false, isLoading: false, error: null });
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
   }, []);
@@ -129,7 +101,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         ...state,
-        setClientId,
         login,
         logout,
         accessToken: getAccessToken()

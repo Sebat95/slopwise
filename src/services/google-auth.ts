@@ -1,40 +1,8 @@
+import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from 'firebase/auth';
+import { auth, googleProvider } from './firebase';
 import type { GoogleTokenInfo, GoogleUserProfile } from '../types';
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/spreadsheets',
-  'https://www.googleapis.com/auth/drive.metadata.readonly',
-  'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/userinfo.email'
-].join(' ');
-
 const SESSION_KEY = 'slopwise_token';
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: {
-            client_id: string;
-            scope: string;
-            callback: (response: {
-              access_token: string;
-              expires_in: number;
-              token_type: string;
-              scope: string;
-              error?: string;
-            }) => void;
-            error_callback?: (error: { type: string; message: string }) => void;
-          }) => {
-            requestAccessToken: (overrides?: {
-              prompt?: '' | 'none' | 'consent' | 'select_account';
-            }) => void;
-          };
-        };
-      };
-    };
-  }
-}
 
 function isValidToken(obj: unknown): obj is GoogleTokenInfo {
   if (!obj || typeof obj !== 'object') return false;
@@ -92,115 +60,54 @@ export function hasStoredToken(): boolean {
   }
 }
 
-function loadGsiScript(): void {
-  if (document.querySelector('script[src*="accounts.google.com/gsi/client"]'))
-    return;
-  const script = document.createElement('script');
-  script.src = 'https://accounts.google.com/gsi/client';
-  script.async = true;
-  document.head.appendChild(script);
-}
-
-export function waitForGoogleScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.google?.accounts?.oauth2) {
-      resolve();
-      return;
+export async function signIn(): Promise<GoogleTokenInfo> {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    
+    if (!credential || !credential.accessToken) {
+      throw new Error('No access token returned from Google');
     }
 
-    loadGsiScript();
-
-    let attempts = 0;
-    const maxAttempts = 100; // 20 seconds
-    const interval = setInterval(() => {
-      if (window.google?.accounts?.oauth2) {
-        clearInterval(interval);
-        resolve();
-      } else if (++attempts > maxAttempts) {
-        clearInterval(interval);
-        reject(
-          new Error(
-            'Google sign-in script failed to load. Check your internet connection and try again.'
-          )
-        );
-      }
-    }, 200);
-  });
+    const tokenInfo: GoogleTokenInfo = {
+      access_token: credential.accessToken,
+      expires_in: 3600, // Google access tokens typically expire in 1 hour
+      token_type: 'Bearer',
+      scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly',
+      expiry_time: Date.now() + 3600 * 1000 - 60000 // 1 hour minus 1 min buffer
+    };
+    
+    storeToken(tokenInfo);
+    return tokenInfo;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(error.message || 'Sign-in failed');
+    }
+    throw new Error('Sign-in failed');
+  }
 }
 
-export async function signIn(clientId: string): Promise<GoogleTokenInfo> {
-  await waitForGoogleScript();
-
-  const gsi = window.google?.accounts?.oauth2;
-  if (!gsi) throw new Error('Google Identity Services not available');
-
-  return new Promise((resolve, reject) => {
-    const tokenClient = gsi.initTokenClient({
-      client_id: clientId,
-      scope: SCOPES,
-      callback: (response) => {
-        if (response.error) {
-          reject(new Error(response.error));
-          return;
-        }
-        const tokenInfo: GoogleTokenInfo = {
-          access_token: response.access_token,
-          expires_in: response.expires_in,
-          token_type: response.token_type,
-          scope: response.scope,
-          expiry_time: Date.now() + response.expires_in * 1000 - 60000
-        };
-        storeToken(tokenInfo);
-        resolve(tokenInfo);
-      },
-      error_callback: (error) => {
-        reject(new Error(error.message || 'Sign-in failed'));
-      }
-    });
-
-    tokenClient.requestAccessToken({ prompt: 'consent' });
-  });
-}
-
-export async function refreshToken(clientId: string): Promise<GoogleTokenInfo> {
+export async function refreshToken(): Promise<GoogleTokenInfo> {
   const existing = getStoredToken();
   if (existing) return existing;
 
-  await waitForGoogleScript();
-  const gsi = window.google?.accounts?.oauth2;
-  if (!gsi) throw new Error('Google Identity Services not available');
-
-  return new Promise((resolve, reject) => {
-    const tokenClient = gsi.initTokenClient({
-      client_id: clientId,
-      scope: SCOPES,
-      callback: (response) => {
-        if (response.error) {
-          reject(new Error(response.error));
-          return;
-        }
-        const tokenInfo: GoogleTokenInfo = {
-          access_token: response.access_token,
-          expires_in: response.expires_in,
-          token_type: response.token_type,
-          scope: response.scope,
-          expiry_time: Date.now() + response.expires_in * 1000 - 60000
-        };
-        storeToken(tokenInfo);
-        resolve(tokenInfo);
-      },
-      error_callback: (error) => {
-        reject(new Error(error.message || 'Token refresh failed'));
-      }
-    });
-
-    // True silent refresh for already-granted sessions.
-    // Using prompt:'' here can trigger an interaction requirement on Android PWAs.
-    tokenClient.requestAccessToken({ prompt: 'none' });
-  });
+  // With Firebase in a PWA, silent refresh of Google OAuth scopes is often blocked 
+  // by third-party cookie restrictions. If the token is expired, we must prompt the user again.
+  // We use signInWithPopup to re-authenticate and get a fresh Google Access Token.
+  return signIn();
 }
 
 export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
+  // We can use Firebase's current user if available
+  if (auth.currentUser) {
+    return {
+      name: auth.currentUser.displayName || '',
+      email: auth.currentUser.email || '',
+      picture: auth.currentUser.photoURL || ''
+    };
+  }
+
+  // Fallback to Google API
   const token = getAccessToken();
   if (!token) return null;
   try {
@@ -219,7 +126,7 @@ export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
   }
 }
 
-export function signOut(): void {
+export async function signOut(): Promise<void> {
   const token = getAccessToken();
   if (token) {
     fetch('https://oauth2.googleapis.com/revoke', {
@@ -229,4 +136,5 @@ export function signOut(): void {
     }).catch(() => {});
   }
   clearToken();
+  await firebaseSignOut(auth);
 }

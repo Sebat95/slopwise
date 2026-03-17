@@ -5,8 +5,18 @@ substitutions:
 
 availableSecrets:
   secretManager:
-    - versionName: projects/slopwise-auth/secrets/VITE_GOOGLE_CLIENT_ID/versions/latest
-      env: VITE_GOOGLE_CLIENT_ID
+    - versionName: projects/slopwise-auth/secrets/VITE_FIREBASE_API_KEY/versions/latest
+      env: VITE_FIREBASE_API_KEY
+    - versionName: projects/slopwise-auth/secrets/VITE_FIREBASE_AUTH_DOMAIN/versions/latest
+      env: VITE_FIREBASE_AUTH_DOMAIN
+    - versionName: projects/slopwise-auth/secrets/VITE_FIREBASE_PROJECT_ID/versions/latest
+      env: VITE_FIREBASE_PROJECT_ID
+    - versionName: projects/slopwise-auth/secrets/VITE_FIREBASE_STORAGE_BUCKET/versions/latest
+      env: VITE_FIREBASE_STORAGE_BUCKET
+    - versionName: projects/slopwise-auth/secrets/VITE_FIREBASE_MESSAGING_SENDER_ID/versions/latest
+      env: VITE_FIREBASE_MESSAGING_SENDER_ID
+    - versionName: projects/slopwise-auth/secrets/VITE_FIREBASE_APP_ID/versions/latest
+      env: VITE_FIREBASE_APP_ID
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -15,12 +25,22 @@ steps:
       - -c
       - |
         docker build \
-          --build-arg VITE_GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID \
+          --build-arg VITE_FIREBASE_API_KEY=$$VITE_FIREBASE_API_KEY \
+          --build-arg VITE_FIREBASE_AUTH_DOMAIN=$$VITE_FIREBASE_AUTH_DOMAIN \
+          --build-arg VITE_FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID \
+          --build-arg VITE_FIREBASE_STORAGE_BUCKET=$$VITE_FIREBASE_STORAGE_BUCKET \
+          --build-arg VITE_FIREBASE_MESSAGING_SENDER_ID=$$VITE_FIREBASE_MESSAGING_SENDER_ID \
+          --build-arg VITE_FIREBASE_APP_ID=$$VITE_FIREBASE_APP_ID \
           -t ${_IMAGE}:$SHORT_SHA \
           -t ${_IMAGE}:latest \
           .
     secretEnv:
-      - VITE_GOOGLE_CLIENT_ID
+      - VITE_FIREBASE_API_KEY
+      - VITE_FIREBASE_AUTH_DOMAIN
+      - VITE_FIREBASE_PROJECT_ID
+      - VITE_FIREBASE_STORAGE_BUCKET
+      - VITE_FIREBASE_MESSAGING_SENDER_ID
+      - VITE_FIREBASE_APP_ID
 
   - name: gcr.io/cloud-builders/docker
     args:

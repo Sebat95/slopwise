@@ -10,10 +10,8 @@ import {
 } from 'lucide-react';
 
 export default function LoginPage() {
-  const { clientId, setClientId, login, isLoading, error } = useAuth();
-  // Captured once on first render via lazy initializer — never changes
-  const [hasPresetClientId] = useState(() => !!clientId);
-  const [showSetup, setShowSetup] = useState(true);
+  const { login, isLoading, error } = useAuth();
+  const [showSetup, setShowSetup] = useState(false);
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-6 py-12">
@@ -28,81 +26,49 @@ export default function LoginPage() {
       </p>
 
       <div className="w-full max-w-sm space-y-4">
-        {!hasPresetClientId && (
-          <>
-            <button
-              onClick={() => setShowSetup((s) => !s)}
-              className="text-text-secondary hover:text-text-primary flex w-full items-center gap-2 text-sm transition-colors"
-            >
-              <Info size={14} />
-              <span>Setup Instructions</span>
-              {showSetup ? (
-                <ChevronUp size={14} className="ml-auto" />
-              ) : (
-                <ChevronDown size={14} className="ml-auto" />
-              )}
-            </button>
+        <button
+          onClick={() => setShowSetup((s) => !s)}
+          className="text-text-secondary hover:text-text-primary flex w-full items-center gap-2 text-sm transition-colors"
+        >
+          <Info size={14} />
+          <span>Firebase Setup Instructions</span>
+          {showSetup ? (
+            <ChevronUp size={14} className="ml-auto" />
+          ) : (
+            <ChevronDown size={14} className="ml-auto" />
+          )}
+        </button>
 
-            {showSetup && (
-              <div className="bg-bg-card border-border text-text-secondary space-y-3 rounded-xl border p-4 text-sm">
-                <p className="text-text-primary font-medium">
-                  First-time setup:
-                </p>
-                <ol className="list-inside list-decimal space-y-2 text-xs">
-                  <li>
-                    Go to{' '}
-                    <a
-                      href="https://console.cloud.google.com/apis/credentials"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary inline-flex items-center gap-0.5 hover:underline"
-                    >
-                      Google Cloud Console <ExternalLink size={10} />
-                    </a>
-                  </li>
-                  <li>Create a project (or select existing)</li>
-                  <li>
-                    Enable <strong>Google Sheets API</strong> and{' '}
-                    <strong>Google Drive API</strong>
-                  </li>
-                  <li>
-                    Go to <strong>Credentials</strong> &rarr;{' '}
-                    <strong>Create OAuth Client ID</strong>
-                  </li>
-                  <li>
-                    Application type: <strong>Web application</strong>
-                  </li>
-                  <li>
-                    Add your app URL to{' '}
-                    <strong>Authorized JavaScript origins</strong>
-                    <br />
-                    <code className="text-primary bg-bg-surface rounded px-1 py-0.5 text-[11px]">
-                      {window.location.origin}
-                    </code>
-                  </li>
-                  <li>
-                    Copy the <strong>Client ID</strong> and paste below
-                  </li>
-                  <li>
-                    Configure the <strong>OAuth consent screen</strong> (add
-                    test users if in testing mode)
-                  </li>
-                </ol>
-              </div>
-            )}
-            <div>
-              <label className="text-text-secondary mb-1.5 block text-xs font-medium">
-                Google OAuth Client ID
-              </label>
-              <input
-                type="text"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                placeholder="xxxx.apps.googleusercontent.com"
-                className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm transition-colors focus:outline-none"
-              />
-            </div>
-          </>
+        {showSetup && (
+          <div className="bg-bg-card border-border text-text-secondary space-y-3 rounded-xl border p-4 text-sm">
+            <p className="text-text-primary font-medium">
+              Firebase configuration required:
+            </p>
+            <ol className="list-inside list-decimal space-y-2 text-xs">
+              <li>
+                Create a project in{' '}
+                <a
+                  href="https://console.firebase.google.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary inline-flex items-center gap-0.5 hover:underline"
+                >
+                  Firebase Console <ExternalLink size={10} />
+                </a>
+              </li>
+              <li>Go to <strong>Authentication</strong> &rarr; <strong>Sign-in method</strong></li>
+              <li>Enable <strong>Google</strong> provider</li>
+              <li>Add your app URL to <strong>Authorized domains</strong></li>
+              <li>Go to <strong>Project Settings</strong> &rarr; <strong>General</strong></li>
+              <li>Add a Web App and copy the <code>firebaseConfig</code></li>
+              <li>
+                Create a <code>.env</code> file based on <code>.env.example</code> and fill in the <code>VITE_FIREBASE_*</code> variables.
+              </li>
+              <li>
+                In Google Cloud Console, ensure <strong>Google Sheets API</strong> and <strong>Google Drive API</strong> are enabled for this Firebase project.
+              </li>
+            </ol>
+          </div>
         )}
 
         {error && (
@@ -113,7 +79,7 @@ export default function LoginPage() {
 
         <button
           onClick={login}
-          disabled={isLoading || !clientId}
+          disabled={isLoading}
           className="flex w-full items-center justify-center gap-3 rounded-xl bg-white px-4 py-3.5 text-sm font-semibold text-gray-800 shadow-lg transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? (
