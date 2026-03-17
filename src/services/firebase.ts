@@ -16,7 +16,9 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 // Add required scopes for the app to function
 googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
-googleProvider.addScope('https://www.googleapis.com/auth/drive.metadata.readonly');
+googleProvider.addScope(
+  'https://www.googleapis.com/auth/drive.metadata.readonly'
+);
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 

@@ -1,4 +1,8 @@
-import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from 'firebase/auth';
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut
+} from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 import type { GoogleTokenInfo, GoogleUserProfile } from '../types';
 
@@ -64,7 +68,7 @@ export async function signIn(): Promise<GoogleTokenInfo> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    
+
     if (!credential || !credential.accessToken) {
       throw new Error('No access token returned from Google');
     }
@@ -73,10 +77,11 @@ export async function signIn(): Promise<GoogleTokenInfo> {
       access_token: credential.accessToken,
       expires_in: 3600, // Google access tokens typically expire in 1 hour
       token_type: 'Bearer',
-      scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly',
+      scope:
+        'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly',
       expiry_time: Date.now() + 3600 * 1000 - 60000 // 1 hour minus 1 min buffer
     };
-    
+
     storeToken(tokenInfo);
     return tokenInfo;
   } catch (error) {
@@ -91,7 +96,7 @@ export async function refreshToken(): Promise<GoogleTokenInfo> {
   const existing = getStoredToken();
   if (existing) return existing;
 
-  // With Firebase in a PWA, silent refresh of Google OAuth scopes is often blocked 
+  // With Firebase in a PWA, silent refresh of Google OAuth scopes is often blocked
   // by third-party cookie restrictions. If the token is expired, we must prompt the user again.
   // We use signInWithPopup to re-authenticate and get a fresh Google Access Token.
   return signIn();

@@ -56,16 +56,33 @@ export default function LoginPage() {
                   Firebase Console <ExternalLink size={10} />
                 </a>
               </li>
-              <li>Go to <strong>Authentication</strong> &rarr; <strong>Sign-in method</strong></li>
-              <li>Enable <strong>Google</strong> provider</li>
-              <li>Add your app URL to <strong>Authorized domains</strong></li>
-              <li>Go to <strong>Project Settings</strong> &rarr; <strong>General</strong></li>
-              <li>Add a Web App and copy the <code>firebaseConfig</code></li>
               <li>
-                Create a <code>.env</code> file based on <code>.env.example</code> and fill in the <code>VITE_FIREBASE_*</code> variables.
+                Go to <strong>Authentication</strong> &rarr;{' '}
+                <strong>Sign-in method</strong>
               </li>
               <li>
-                In Google Cloud Console, ensure <strong>Google Sheets API</strong> and <strong>Google Drive API</strong> are enabled for this Firebase project.
+                Enable <strong>Google</strong> provider
+              </li>
+              <li>
+                Add your app URL to <strong>Authorized domains</strong>
+              </li>
+              <li>
+                Go to <strong>Project Settings</strong> &rarr;{' '}
+                <strong>General</strong>
+              </li>
+              <li>
+                Add a Web App and copy the <code>firebaseConfig</code>
+              </li>
+              <li>
+                Create a <code>.env</code> file based on{' '}
+                <code>.env.example</code> and fill in the{' '}
+                <code>VITE_FIREBASE_*</code> variables.
+              </li>
+              <li>
+                In Google Cloud Console, ensure{' '}
+                <strong>Google Sheets API</strong> and{' '}
+                <strong>Google Drive API</strong> are enabled for this Firebase
+                project.
               </li>
             </ol>
           </div>

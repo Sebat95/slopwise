@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // User is logged into Firebase. 
+        // User is logged into Firebase.
         // We still need to check if the Google Access Token for Sheets API is valid.
         if (isTokenValid()) {
           setState({ isAuthenticated: true, isLoading: false, error: null });
@@ -49,11 +49,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Token expired, but user is known. Try to refresh or prompt.
           refreshToken()
             .then(() => {
-              setState({ isAuthenticated: true, isLoading: false, error: null });
+              setState({
+                isAuthenticated: true,
+                isLoading: false,
+                error: null
+              });
             })
             .catch(() => {
               // Silent refresh failed (common in PWAs). User needs to interact.
-              setState({ isAuthenticated: false, isLoading: false, error: null });
+              setState({
+                isAuthenticated: false,
+                isLoading: false,
+                error: null
+              });
             });
         }
       } else {
@@ -65,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // Periodic check: if token expires while app is open, we can't silently refresh 
+  // Periodic check: if token expires while app is open, we can't silently refresh
   // easily in a PWA with Firebase without user interaction, but we can update state.
   useEffect(() => {
     const interval = setInterval(() => {
