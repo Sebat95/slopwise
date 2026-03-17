@@ -52,6 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clientId
   });
 
+  // Hint to Android/Chrome that this app should keep storage data.
+  useEffect(() => {
+    if (!('storage' in navigator) || !navigator.storage?.persist) return;
+    navigator.storage.persist().catch(() => {
+      // Ignore: persistence is best-effort and can be denied by the browser.
+    });
+  }, []);
+
   // On mount: if token expired but exists, try silent refresh
   useEffect(() => {
     if (!canRefresh) return;

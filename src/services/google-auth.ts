@@ -26,7 +26,9 @@ declare global {
             }) => void;
             error_callback?: (error: { type: string; message: string }) => void;
           }) => {
-            requestAccessToken: (overrides?: { prompt?: string }) => void;
+            requestAccessToken: (overrides?: {
+              prompt?: '' | 'none' | 'consent' | 'select_account';
+            }) => void;
           };
         };
       };
@@ -156,7 +158,7 @@ export async function signIn(clientId: string): Promise<GoogleTokenInfo> {
       }
     });
 
-    tokenClient.requestAccessToken({ prompt: '' });
+    tokenClient.requestAccessToken({ prompt: 'consent' });
   });
 }
 
@@ -192,7 +194,9 @@ export async function refreshToken(clientId: string): Promise<GoogleTokenInfo> {
       }
     });
 
-    tokenClient.requestAccessToken({ prompt: '' });
+    // True silent refresh for already-granted sessions.
+    // Using prompt:'' here can trigger an interaction requirement on Android PWAs.
+    tokenClient.requestAccessToken({ prompt: 'none' });
   });
 }
 
