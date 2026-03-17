@@ -1,7 +1,7 @@
 substitutions:
   _REGION: europe-west1
-  _SERVICE: slopwise-run
-  _IMAGE: europe-west1-docker.pkg.dev/slopwise-auth/cloud-run-source-deploy/slopwise/slopwise-run
+  _SERVICE: slopwise
+  _IMAGE: europe-west1-docker.pkg.dev/slopwise-auth-1bb0d/cloud-run-source-deploy/slopwise/slopwise
 
 availableSecrets:
   secretManager:
