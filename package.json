@@ -1,7 +1,7 @@
 {
   "name": "slopwise",
   "private": true,
-  "version": "1.4.5",
+  "version": "1.4.6",
   "packageManager": "yarn@4.12.0",
   "type": "module",
   "scripts": {
