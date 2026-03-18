@@ -38,7 +38,7 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 - React 19 + TypeScript
 - Vite
 - Tailwind CSS v4
-- Google Identity Services (OAuth 2.0)
+- Firebase Authentication (Google OAuth 2.0)
 - Google Sheets API v4 + Google Drive API v3
 - vite-plugin-pwa (Workbox)
 
@@ -52,30 +52,32 @@ cd slopwise
 yarn install
 ```
 
-### 2. Set up Google OAuth
+### 2. Set up Firebase & Google Cloud
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or select an existing one)
-3. Enable the **Google Sheets API** and **Google Drive API**
-4. Go to **APIs & Services → Credentials**
-5. Click **Create Credentials → OAuth client ID**
-6. Application type: **Web application**
-7. Under **Authorized JavaScript origins**, add:
-   - `http://localhost:5173` (for development)
-   - Your production domain (for deployment)
-8. Copy the **Client ID**
-9. Go to **OAuth consent screen**, configure it, and add test users if in testing mode
+1. Go to [Firebase Console](https://console.firebase.google.com/) and create a new project.
+2. Go to **Authentication → Sign-in method** and enable **Google**.
+3. Go to **Project Settings → General**, add a Web App, and copy the `firebaseConfig` object.
+4. Go to [Google Cloud Console](https://console.cloud.google.com/) and select the project Firebase just created.
+5. Enable the **Google Sheets API** and **Google Drive API**.
+6. Go to **APIs & Services → OAuth consent screen**, configure it, and add test users if in testing mode.
 
-### 3. Configure the client ID
+### 3. Configure Environment Variables
 
-Either create a `.env` file:
+Create a `.env` file from the example:
 
 ```bash
 cp .env.example .env
-# Edit .env and set your client ID
 ```
 
-Or enter it directly on the login page — it will be saved in localStorage.
+Edit `.env` and paste your Firebase config values:
+```env
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
 
 ### 4. Run
 
