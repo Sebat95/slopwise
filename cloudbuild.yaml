@@ -5,17 +5,17 @@ substitutions:
 
 availableSecrets:
   secretManager:
-    - versionName: projects/468513744130/secrets/VITE_FIREBASE_API_KEY/versions/latest
+    - versionName: projects/slopwise-auth-1bb0d/secrets/VITE_FIREBASE_API_KEY/versions/latest
       env: VITE_FIREBASE_API_KEY
-    - versionName: projects/468513744130/secrets/VITE_FIREBASE_AUTH_DOMAIN/versions/latest
+    - versionName: projects/slopwise-auth-1bb0d/secrets/VITE_FIREBASE_AUTH_DOMAIN/versions/latest
       env: VITE_FIREBASE_AUTH_DOMAIN
-    - versionName: projects/468513744130/secrets/VITE_FIREBASE_PROJECT_ID/versions/latest
+    - versionName: projects/slopwise-auth-1bb0d/secrets/VITE_FIREBASE_PROJECT_ID/versions/latest
       env: VITE_FIREBASE_PROJECT_ID
-    - versionName: projects/468513744130/secrets/VITE_FIREBASE_STORAGE_BUCKET/versions/latest
+    - versionName: projects/slopwise-auth-1bb0d/secrets/VITE_FIREBASE_STORAGE_BUCKET/versions/latest
       env: VITE_FIREBASE_STORAGE_BUCKET
-    - versionName: projects/468513744130/secrets/VITE_FIREBASE_MESSAGING_SENDER_ID/versions/latest
+    - versionName: projects/slopwise-auth-1bb0d/secrets/VITE_FIREBASE_MESSAGING_SENDER_ID/versions/latest
       env: VITE_FIREBASE_MESSAGING_SENDER_ID
-    - versionName: projects/468513744130/secrets/VITE_FIREBASE_APP_ID/versions/latest
+    - versionName: projects/slopwise-auth-1bb0d/secrets/VITE_FIREBASE_APP_ID/versions/latest
       env: VITE_FIREBASE_APP_ID
 
 steps:
