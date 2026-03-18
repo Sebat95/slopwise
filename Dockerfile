@@ -6,9 +6,10 @@ RUN rm -rf /opt/yarn* /usr/local/bin/yarn* && \
     npm install -g corepack@latest && \
     corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
-#COPY .yarn ./.yarn
+# COPY .yarn ./.yarn # if in the future there will be some yarn plugins
 RUN yarn install --immutable
 COPY . .
+
 # args like the env.example
 ARG VITE_FIREBASE_API_KEY
 ARG VITE_FIREBASE_AUTH_DOMAIN
