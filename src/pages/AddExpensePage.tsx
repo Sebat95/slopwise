@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
@@ -52,14 +52,35 @@ export default function AddExpensePage() {
   );
   const isEdit = !!existing;
 
+  const getPresetValues = useCallback(
+    (type: SplitType): Record<string, number> => {
+      const preset = lastSplitValuePresets[type] || {};
+      return members.reduce<Record<string, number>>((acc, member) => {
+        const value = preset[member];
+        if (Number.isFinite(value)) acc[member] = value;
+        return acc;
+      }, {});
+    },
+    [lastSplitValuePresets, members]
+  );
+
+  const getPresetInvolved = useCallback(
+    (type: SplitType): Set<string> => {
+      const presetValues = getPresetValues(type);
+      const presetMembers = members.filter(
+        (member) => (presetValues[member] ?? 0) > 0
+      );
+      return new Set(presetMembers.length > 0 ? presetMembers : members);
+    },
+    [getPresetValues, members]
+  );
+
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(todayStr());
   const [category, setCategory] = useState('General');
   const [expCurrency, setExpCurrency] = useState(currency);
-  const [paidBy, setPaidByLocal] = useState(
-    lastPaidBy && members.includes(lastPaidBy) ? lastPaidBy : members[0] || ''
-  );
+  const [paidBy, setPaidByLocal] = useState('');
   const setPaidBy = (name: string) => {
     setPaidByLocal(name);
     if (!isEdit) setLastPaidBy(name);
@@ -69,15 +90,15 @@ export default function AddExpensePage() {
     setSplitTypeLocal(type);
     setLastSplitType(type);
     if (!isEdit) {
-      setSplitValues(lastSplitValuePresets[type] || {});
+      setSplitValues(getPresetValues(type));
+      setInvolved(getPresetInvolved(type));
     }
   };
-  const [splitValues, setSplitValues] = useState<Record<string, number>>(
-    () => lastSplitValuePresets[lastSplitType] || {}
-  );
-  const [involved, setInvolved] = useState<Set<string>>(new Set(members));
+  const [splitValues, setSplitValues] = useState<Record<string, number>>({});
+  const [involved, setInvolved] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasInitializedNewExpense = useRef(false);
 
   useEffect(() => {
     if (!existing) return;
@@ -115,10 +136,27 @@ export default function AddExpensePage() {
   }, [existing]);
 
   useEffect(() => {
-    if (isEdit) return;
-    setSplitTypeLocal(lastSplitType);
-    setSplitValues(lastSplitValuePresets[lastSplitType] || {});
-  }, [isEdit, lastSplitType, lastSplitValuePresets]);
+    if (isEdit || hasInitializedNewExpense.current || members.length === 0)
+      return;
+
+    hasInitializedNewExpense.current = true;
+    const nextSplitType = lastSplitType;
+    setExpCurrency(currency);
+    setPaidByLocal(
+      lastPaidBy && members.includes(lastPaidBy) ? lastPaidBy : members[0] || ''
+    );
+    setSplitTypeLocal(nextSplitType);
+    setSplitValues(getPresetValues(nextSplitType));
+    setInvolved(getPresetInvolved(nextSplitType));
+  }, [
+    currency,
+    getPresetInvolved,
+    getPresetValues,
+    isEdit,
+    lastPaidBy,
+    lastSplitType,
+    members
+  ]);
 
   const cost = parseAmount(amount);
 
@@ -150,6 +188,10 @@ export default function AddExpensePage() {
     }
     if (!paidBy) {
       setError('Select who paid');
+      return;
+    }
+    if (involved.size === 0) {
+      setError('Select at least one member to split with');
       return;
     }
 
@@ -184,7 +226,14 @@ export default function AddExpensePage() {
 
     try {
       if (!isEdit) {
-        setLastSplitValuesForType(splitType, splitValues);
+        const rememberedValues = [...involved].reduce<Record<string, number>>(
+          (acc, member) => {
+            acc[member] = splitValues[member] ?? 0;
+            return acc;
+          },
+          {}
+        );
+        setLastSplitValuesForType(splitType, rememberedValues);
       }
       const splits = calculateSplits(
         cost,
@@ -408,7 +457,7 @@ export default function AddExpensePage() {
                         type="number"
                         value={splitValues[m] ?? ''}
                         onChange={(e) =>
-                          setSplitValue(m, parseFloat(e.target.value) || 0)
+                          setSplitValue(m, parseAmount(e.target.value))
                         }
                         placeholder="0.00"
                         step="0.01"
@@ -421,7 +470,7 @@ export default function AddExpensePage() {
                           type="number"
                           value={splitValues[m] ?? ''}
                           onChange={(e) =>
-                            setSplitValue(m, parseFloat(e.target.value) || 0)
+                            setSplitValue(m, parseAmount(e.target.value))
                           }
                           placeholder="0"
                           className="bg-bg-input border-border text-text-primary focus:border-primary w-16 rounded-lg border px-2 py-1.5 text-right text-sm focus:outline-none"
@@ -435,7 +484,7 @@ export default function AddExpensePage() {
                           type="number"
                           value={splitValues[m] ?? 1}
                           onChange={(e) =>
-                            setSplitValue(m, parseFloat(e.target.value) || 0)
+                            setSplitValue(m, parseAmount(e.target.value))
                           }
                           min="0"
                           className="bg-bg-input border-border text-text-primary focus:border-primary w-16 rounded-lg border px-2 py-1.5 text-right text-sm focus:outline-none"

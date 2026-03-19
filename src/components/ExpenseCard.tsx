@@ -22,11 +22,14 @@ export default function ExpenseCard({
   onDelete
 }: Props) {
   const isSettlement = expense.category === 'Payment';
+  const isClickable = !!onEdit;
 
   return (
     <div
-      className="bg-bg-card border-border/50 hover:border-border group flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors"
-      onClick={() => onEdit?.(expense.id)}
+      className={`bg-bg-card border-border/50 group flex items-center gap-3 rounded-xl border p-3 transition-colors ${
+        isClickable ? 'hover:border-border cursor-pointer' : ''
+      }`}
+      onClick={isClickable ? () => onEdit(expense.id) : undefined}
     >
       <div className="bg-bg-surface flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg">
         {getCategoryEmoji(expense.category)}

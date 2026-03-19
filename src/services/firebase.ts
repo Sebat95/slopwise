@@ -1,5 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  getAuth,
+  GoogleAuthProvider,
+  setPersistence
+} from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,6 +17,7 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+void setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 export const googleProvider = new GoogleAuthProvider();
 // Add required scopes for the app to function
@@ -21,8 +27,3 @@ googleProvider.addScope(
 );
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
-
-// Force account selection every time to ensure we get a fresh token if needed
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});

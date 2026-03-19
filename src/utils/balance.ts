@@ -8,8 +8,8 @@ export function calculateNetBalances(
   for (const m of members) balances[m] = 0;
 
   for (const expense of expenses) {
-    for (const [member, net] of Object.entries(expense.splits)) {
-      balances[member] = (balances[member] ?? 0) + net;
+    for (const member of members) {
+      balances[member] += expense.splits[member] ?? 0;
     }
   }
 

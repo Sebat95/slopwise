@@ -93,13 +93,13 @@ export default function SettingsPage() {
     downloadCSV(csv, filename);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (
       window.confirm(
         'Sign out? You will need to sign in again to access your sheets.'
       )
     ) {
-      logout();
+      await logout();
       navigate('/');
     }
   };

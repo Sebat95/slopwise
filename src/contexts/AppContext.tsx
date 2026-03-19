@@ -72,6 +72,22 @@ function emptySplitValuePresets(): SplitValuePresets {
   return { equal: {}, exact: {}, percentage: {}, shares: {} };
 }
 
+function renameSplitPresetMember(
+  presets: SplitValuePresets,
+  oldName: string,
+  newName: string
+): SplitValuePresets {
+  const next = emptySplitValuePresets();
+
+  for (const type of Object.keys(next) as SplitType[]) {
+    for (const [member, value] of Object.entries(presets[type])) {
+      next[type][member === oldName ? newName : member] = value;
+    }
+  }
+
+  return next;
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>({
     spreadsheetId: getSsId(),
@@ -101,7 +117,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       spreadsheetName: name,
       members: [],
       memberProfiles: {},
-      expenses: []
+      expenses: [],
+      lastSplitType: 'equal',
+      lastPaidBy: '',
+      lastSplitValuePresets: emptySplitValuePresets(),
+      error: null
     }));
   }, []);
 
@@ -278,6 +298,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const trimmed = newName.trim();
       const current = stateRef.current;
       if (current.members.includes(trimmed)) return;
+      const renamedPresets = renameSplitPresetMember(
+        current.lastSplitValuePresets,
+        oldName,
+        trimmed
+      );
+      const nextLastPaidBy =
+        current.lastPaidBy === oldName ? trimmed : current.lastPaidBy;
 
       setState((s) => ({
         ...s,
@@ -302,6 +329,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           return p;
         })(),
+        lastPaidBy: nextLastPaidBy,
+        lastSplitValuePresets: renamedPresets,
         isSyncing: true
       }));
 
@@ -327,6 +356,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
         await sheetsApi
           .writeAllMemberProfiles(ssId, updatedProfiles)
+          .catch(() => {});
+        if (nextLastPaidBy) {
+          await sheetsApi
+            .saveSetting(ssId, 'lastPaidBy', nextLastPaidBy)
+            .catch(() => {});
+        }
+        await sheetsApi
+          .saveSetting(
+            ssId,
+            'lastSplitValuePresets',
+            JSON.stringify(renamedPresets)
+          )
           .catch(() => {});
         setState((s) => ({ ...s, isSyncing: false }));
       } catch (err) {
@@ -521,19 +562,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         sanitized[trimmed] = value;
       }
 
-      setState((s) => {
-        const next = {
-          ...s.lastSplitValuePresets,
-          [type]: sanitized
-        };
-        const ssId = getSsId();
-        if (ssId) {
-          sheetsApi
-            .saveSetting(ssId, 'lastSplitValuePresets', JSON.stringify(next))
-            .catch(() => {});
-        }
-        return { ...s, lastSplitValuePresets: next };
-      });
+      const next = {
+        ...stateRef.current.lastSplitValuePresets,
+        [type]: sanitized
+      };
+      setState((s) => ({ ...s, lastSplitValuePresets: next }));
+
+      const ssId = getSsId();
+      if (ssId) {
+        sheetsApi
+          .saveSetting(ssId, 'lastSplitValuePresets', JSON.stringify(next))
+          .catch(() => {});
+      }
     },
     []
   );
@@ -547,7 +587,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       spreadsheetName: null,
       members: [],
       memberProfiles: {},
-      expenses: []
+      expenses: [],
+      lastSplitType: 'equal',
+      lastPaidBy: '',
+      lastSplitValuePresets: emptySplitValuePresets(),
+      error: null
     }));
   }, []);
 
