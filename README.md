@@ -70,6 +70,7 @@ cp .env.example .env
 ```
 
 Edit `.env` and paste your Firebase config values:
+
 ```env
 VITE_FIREBASE_API_KEY=your_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
