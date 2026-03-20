@@ -6,7 +6,7 @@ import {
 import { auth, googleProvider } from './firebase';
 import type { GoogleTokenInfo, GoogleUserProfile } from '../types';
 
-const SESSION_KEY = 'slopwise_token';
+const TOKEN_KEY = 'slopwise_token';
 
 function isValidToken(obj: unknown): obj is GoogleTokenInfo {
   if (!obj || typeof obj !== 'object') return false;
@@ -20,11 +20,11 @@ function isValidToken(obj: unknown): obj is GoogleTokenInfo {
 
 function getStoredToken(): GoogleTokenInfo | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(TOKEN_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isValidToken(parsed)) {
-      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(TOKEN_KEY);
       return null;
     }
     if (Date.now() >= parsed.expiry_time) {
@@ -32,17 +32,17 @@ function getStoredToken(): GoogleTokenInfo | null {
     }
     return parsed;
   } catch {
-    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(TOKEN_KEY);
     return null;
   }
 }
 
 function storeToken(token: GoogleTokenInfo): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(token));
+  localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 export function getAccessToken(): string | null {
@@ -55,7 +55,7 @@ export function isTokenValid(): boolean {
 
 export function hasStoredToken(): boolean {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(TOKEN_KEY);
     if (!raw) return false;
     const parsed: unknown = JSON.parse(raw);
     return isValidToken(parsed);
@@ -64,46 +64,42 @@ export function hasStoredToken(): boolean {
   }
 }
 
-export async function signIn(): Promise<GoogleTokenInfo> {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
+export function isFirebaseUserPresent(): boolean {
+  return auth.currentUser !== null;
+}
 
-    if (!credential || !credential.accessToken) {
-      throw new Error('No access token returned from Google');
-    }
+async function doSignInWithPopup(): Promise<GoogleTokenInfo> {
+  const result = await signInWithPopup(auth, googleProvider);
+  const credential = GoogleAuthProvider.credentialFromResult(result);
 
-    const tokenInfo: GoogleTokenInfo = {
-      access_token: credential.accessToken,
-      expires_in: 3600, // Google access tokens typically expire in 1 hour
-      token_type: 'Bearer',
-      scope:
-        'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly',
-      expiry_time: Date.now() + 3600 * 1000 - 60000 // 1 hour minus 1 min buffer
-    };
-
-    storeToken(tokenInfo);
-    return tokenInfo;
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(error.message || 'Sign-in failed');
-    }
-    throw new Error('Sign-in failed');
+  if (!credential?.accessToken) {
+    throw new Error('No access token returned from Google');
   }
+
+  const tokenInfo: GoogleTokenInfo = {
+    access_token: credential.accessToken,
+    expires_in: 3600,
+    token_type: 'Bearer',
+    scope:
+      'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly',
+    expiry_time: Date.now() + 3600 * 1000 - 60000
+  };
+
+  storeToken(tokenInfo);
+  return tokenInfo;
+}
+
+export async function signIn(): Promise<GoogleTokenInfo> {
+  return doSignInWithPopup();
 }
 
 export async function refreshToken(): Promise<GoogleTokenInfo> {
   const existing = getStoredToken();
   if (existing) return existing;
-
-  // With Firebase in a PWA, silent refresh of Google OAuth scopes is often blocked
-  // by third-party cookie restrictions. If the token is expired, we must prompt the user again.
-  // We use signInWithPopup to re-authenticate and get a fresh Google Access Token.
-  return signIn();
+  return doSignInWithPopup();
 }
 
 export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
-  // We can use Firebase's current user if available
   if (auth.currentUser) {
     return {
       name: auth.currentUser.displayName || '',
@@ -112,7 +108,6 @@ export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
     };
   }
 
-  // Fallback to Google API
   const token = getAccessToken();
   if (!token) return null;
   try {
@@ -132,14 +127,6 @@ export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
 }
 
 export async function signOut(): Promise<void> {
-  const token = getAccessToken();
-  if (token) {
-    fetch('https://oauth2.googleapis.com/revoke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `token=${encodeURIComponent(token)}`
-    }).catch(() => {});
-  }
   clearToken();
   await firebaseSignOut(auth);
 }
