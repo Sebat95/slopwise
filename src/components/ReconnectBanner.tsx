@@ -9,9 +9,7 @@ export default function ReconnectBanner() {
   return (
     <div className="bg-warning/15 border-warning/30 fixed top-0 right-0 left-0 z-[90] border-b px-4 py-3 text-center">
       <div className="mx-auto flex max-w-lg items-center justify-center gap-3">
-        <span className="text-text-primary text-sm">
-          Session expired.
-        </span>
+        <span className="text-text-primary text-sm">Session expired.</span>
         <button
           onClick={reconnect}
           disabled={isLoading}
@@ -25,9 +23,7 @@ export default function ReconnectBanner() {
           Reconnect
         </button>
       </div>
-      {error && (
-        <p className="text-danger mt-1 text-xs">{error}</p>
-      )}
+      {error && <p className="text-danger mt-1 text-xs">{error}</p>}
     </div>
   );
 }
