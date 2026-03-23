@@ -56,10 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (msg === 'no_refresh_token') {
               // First-time user or refresh token lost — need full sign-in
               clearToken();
-              setState({ isAuthenticated: false, isLoading: false, error: null });
+              setState({
+                isAuthenticated: false,
+                isLoading: false,
+                error: null
+              });
             } else {
               // Temporary failure (network etc.) — stay authenticated, retry later
-              setState({ isAuthenticated: true, isLoading: false, error: null });
+              setState({
+                isAuthenticated: true,
+                isLoading: false,
+                error: null
+              });
             }
           }
         }

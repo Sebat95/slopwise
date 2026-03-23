@@ -1,4 +1,7 @@
-import { signInWithCustomToken, signOut as firebaseSignOut } from 'firebase/auth';
+import {
+  signInWithCustomToken,
+  signOut as firebaseSignOut
+} from 'firebase/auth';
 import { auth } from './firebase';
 import type { GoogleTokenInfo, GoogleUserProfile } from '../types';
 
@@ -82,7 +85,10 @@ declare global {
 
 function waitForGsi(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (window.google?.accounts?.oauth2) { resolve(); return; }
+    if (window.google?.accounts?.oauth2) {
+      resolve();
+      return;
+    }
     let attempts = 0;
     const interval = setInterval(() => {
       if (window.google?.accounts?.oauth2) {
@@ -108,8 +114,14 @@ function requestAuthCode(clientId: string): Promise<string> {
       ].join(' '),
       ux_mode: 'popup',
       callback: (response) => {
-        if (response.error) { reject(new Error(response.error)); return; }
-        if (!response.code) { reject(new Error('No auth code returned')); return; }
+        if (response.error) {
+          reject(new Error(response.error));
+          return;
+        }
+        if (!response.code) {
+          reject(new Error('No auth code returned'));
+          return;
+        }
         resolve(response.code);
       }
     });

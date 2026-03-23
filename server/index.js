@@ -56,10 +56,16 @@ app.post('/api/exchangeCode', async (req, res) => {
     }
 
     if (tokens.refresh_token) {
-      await getFirestore().collection('user_tokens').doc(firebaseUser.uid).set(
-        { refresh_token: tokens.refresh_token, updated_at: new Date().toISOString() },
-        { merge: true }
-      );
+      await getFirestore()
+        .collection('user_tokens')
+        .doc(firebaseUser.uid)
+        .set(
+          {
+            refresh_token: tokens.refresh_token,
+            updated_at: new Date().toISOString()
+          },
+          { merge: true }
+        );
     }
 
     const customToken = await getAuth().createCustomToken(firebaseUser.uid);
@@ -78,7 +84,9 @@ app.post('/api/exchangeCode', async (req, res) => {
     });
   } catch (err) {
     console.error('exchangeCode error:', err);
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Exchange failed' });
+    res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : 'Exchange failed' });
   }
 });
 
@@ -89,10 +97,15 @@ app.post('/api/refreshGoogleToken', async (req, res) => {
 
   try {
     const decoded = await getAuth().verifyIdToken(idToken);
-    const doc = await getFirestore().collection('user_tokens').doc(decoded.uid).get();
+    const doc = await getFirestore()
+      .collection('user_tokens')
+      .doc(decoded.uid)
+      .get();
 
     if (!doc.exists || !doc.data()?.refresh_token) {
-      return res.status(404).json({ error: 'no_refresh_token', message: 'Please sign in again.' });
+      return res
+        .status(404)
+        .json({ error: 'no_refresh_token', message: 'Please sign in again.' });
     }
 
     const client = getOAuth2Client();
@@ -104,10 +117,16 @@ app.post('/api/refreshGoogleToken', async (req, res) => {
     }
 
     if (credentials.refresh_token) {
-      await getFirestore().collection('user_tokens').doc(decoded.uid).set(
-        { refresh_token: credentials.refresh_token, updated_at: new Date().toISOString() },
-        { merge: true }
-      );
+      await getFirestore()
+        .collection('user_tokens')
+        .doc(decoded.uid)
+        .set(
+          {
+            refresh_token: credentials.refresh_token,
+            updated_at: new Date().toISOString()
+          },
+          { merge: true }
+        );
     }
 
     res.json({
@@ -118,22 +137,26 @@ app.post('/api/refreshGoogleToken', async (req, res) => {
     });
   } catch (err) {
     console.error('refreshGoogleToken error:', err);
-    res.status(401).json({ error: err instanceof Error ? err.message : 'Refresh failed' });
+    res
+      .status(401)
+      .json({ error: err instanceof Error ? err.message : 'Refresh failed' });
   }
 });
 
 // --- Static file serving (SPA) ---
-app.use(express.static(STATIC_DIR, {
-  maxAge: '1y',
-  immutable: true,
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+app.use(
+  express.static(STATIC_DIR, {
+    maxAge: '1y',
+    immutable: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
     }
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-  }
-}));
+  })
+);
 
 // CSP and security headers for HTML responses
 function setSecurityHeaders(res) {
@@ -148,7 +171,7 @@ function setSecurityHeaders(res) {
       "style-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com",
       "img-src 'self' blob: data: https://*.googleusercontent.com",
       "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://sheets.googleapis.com https://*.googleusercontent.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
-      "frame-src https://accounts.google.com https://*.firebaseapp.com",
+      'frame-src https://accounts.google.com https://*.firebaseapp.com',
       "worker-src 'self' blob:"
     ].join('; ')
   );
