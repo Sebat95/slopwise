@@ -17,8 +17,8 @@ availableSecrets:
       env: VITE_FIREBASE_MESSAGING_SENDER_ID
     - versionName: projects/468513744130/secrets/VITE_FIREBASE_APP_ID/versions/latest
       env: VITE_FIREBASE_APP_ID
-    - versionName: projects/468513744130/secrets/VITE_GOOGLE_CLIENT_ID/versions/latest
-      env: VITE_GOOGLE_CLIENT_ID
+    - versionName: projects/468513744130/secrets/GOOGLE_CLIENT_ID/versions/latest
+      env: GOOGLE_CLIENT_ID
     - versionName: projects/468513744130/secrets/GOOGLE_CLIENT_SECRET/versions/latest
       env: GOOGLE_CLIENT_SECRET
 
@@ -35,7 +35,7 @@ steps:
           --build-arg VITE_FIREBASE_STORAGE_BUCKET=$$VITE_FIREBASE_STORAGE_BUCKET \
           --build-arg VITE_FIREBASE_MESSAGING_SENDER_ID=$$VITE_FIREBASE_MESSAGING_SENDER_ID \
           --build-arg VITE_FIREBASE_APP_ID=$$VITE_FIREBASE_APP_ID \
-          --build-arg VITE_GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID \
+          --build-arg GOOGLE_CLIENT_ID=$$GOOGLE_CLIENT_ID \
           -t ${_IMAGE}:$SHORT_SHA \
           -t ${_IMAGE}:latest \
           .
@@ -46,7 +46,7 @@ steps:
       - VITE_FIREBASE_STORAGE_BUCKET
       - VITE_FIREBASE_MESSAGING_SENDER_ID
       - VITE_FIREBASE_APP_ID
-      - VITE_GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_ID
 
   - name: gcr.io/cloud-builders/docker
     args:
@@ -64,9 +64,9 @@ steps:
           --region=${_REGION} \
           --platform=managed \
           --allow-unauthenticated \
-          --set-env-vars="GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$$GOOGLE_CLIENT_SECRET"
+          --set-env-vars="GOOGLE_CLIENT_ID=$$GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$$GOOGLE_CLIENT_SECRET"
     secretEnv:
-      - VITE_GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_ID
       - GOOGLE_CLIENT_SECRET
 
 images:
