@@ -19,6 +19,8 @@ availableSecrets:
       env: VITE_FIREBASE_APP_ID
     - versionName: projects/468513744130/secrets/VITE_GOOGLE_CLIENT_ID/versions/latest
       env: VITE_GOOGLE_CLIENT_ID
+    - versionName: projects/468513744130/secrets/VITE_GOOGLE_CLIENT_SECRET/versions/latest
+      env: VITE_GOOGLE_CLIENT_SECRET
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -45,6 +47,7 @@ steps:
       - VITE_FIREBASE_MESSAGING_SENDER_ID
       - VITE_FIREBASE_APP_ID
       - VITE_GOOGLE_CLIENT_ID
+      - VITE_GOOGLE_CLIENT_SECRET
 
   - name: gcr.io/cloud-builders/docker
     args:
@@ -53,15 +56,19 @@ steps:
       - ${_IMAGE}
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - ${_SERVICE}
-      - --image=${_IMAGE}:$SHORT_SHA
-      - --region=${_REGION}
-      - --platform=managed
-      - --allow-unauthenticated
+      - -c
+      - |
+        gcloud run deploy ${_SERVICE} \
+          --image=${_IMAGE}:$SHORT_SHA \
+          --region=${_REGION} \
+          --platform=managed \
+          --allow-unauthenticated \
+          --set-env-vars="VITE_GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID,VITE_GOOGLE_CLIENT_SECRET=$$VITE_GOOGLE_CLIENT_SECRET"
+    secretEnv:
+      - VITE_GOOGLE_CLIENT_ID
+      - VITE_GOOGLE_CLIENT_SECRET
 
 images:
   - ${_IMAGE}:$SHORT_SHA

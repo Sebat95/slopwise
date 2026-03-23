@@ -14,10 +14,10 @@ const PORT = parseInt(process.env.PORT || '8080', 10);
 initializeApp();
 
 function getOAuth2Client() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.VITE_GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
+    throw new Error('Missing VITE_GOOGLE_CLIENT_ID or VITE_GOOGLE_CLIENT_SECRET');
   }
   return new OAuth2Client(clientId, clientSecret, 'postmessage');
 }
