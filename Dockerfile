@@ -13,6 +13,7 @@ ARG VITE_FIREBASE_PROJECT_ID
 ARG VITE_FIREBASE_STORAGE_BUCKET
 ARG VITE_FIREBASE_MESSAGING_SENDER_ID
 ARG VITE_FIREBASE_APP_ID
+ARG VITE_GOOGLE_CLIENT_ID
 
 # fail fast if any required build arg is missing
 RUN test -n "$VITE_FIREBASE_API_KEY" || (echo "ERROR: VITE_FIREBASE_API_KEY is empty" && exit 1)
@@ -23,19 +24,29 @@ ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
 ENV VITE_FIREBASE_STORAGE_BUCKET=$VITE_FIREBASE_STORAGE_BUCKET
 ENV VITE_FIREBASE_MESSAGING_SENDER_ID=$VITE_FIREBASE_MESSAGING_SENDER_ID
 ENV VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+# API endpoints are on the same origin, no separate URL needed
+ENV VITE_FUNCTIONS_URL=
 
 # copy stuff to build
 COPY package.json yarn.lock .yarnrc.yml ./
-# COPY .yarn ./.yarn # if in the future there will be some yarn plugins
 RUN yarn install --immutable
 COPY . .
 
-# build
+# build frontend
 RUN yarn run build
 
 ### Serve Stage
-FROM nginx:1.29.5-alpine AS serve
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/nginx.conf
+FROM node:25-alpine AS serve
+WORKDIR /app
+
+# Install server dependencies
+COPY server/package.json ./
+RUN npm install --production
+
+# Copy server code and built frontend
+COPY server/index.js ./
+COPY --from=build /app/dist ./public
+
 EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "index.js"]

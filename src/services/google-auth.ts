@@ -3,7 +3,7 @@ import { auth } from './firebase';
 import type { GoogleTokenInfo, GoogleUserProfile } from '../types';
 
 const TOKEN_KEY = 'slopwise_token';
-const FUNCTIONS_BASE = import.meta.env.VITE_FUNCTIONS_URL || '';
+const API_BASE = import.meta.env.VITE_FUNCTIONS_URL || '';
 
 // --- Token storage ---
 
@@ -129,7 +129,7 @@ export async function signIn(): Promise<GoogleTokenInfo> {
   const code = await requestAuthCode(clientId);
 
   // Exchange code on server → access token + refresh token stored + Firebase custom token
-  const res = await fetch(`${FUNCTIONS_BASE}/exchangeCode`, {
+  const res = await fetch(`${API_BASE}/api/exchangeCode`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code })
@@ -169,7 +169,7 @@ export async function refreshToken(): Promise<GoogleTokenInfo> {
 
   const idToken = await user.getIdToken(true);
 
-  const res = await fetch(`${FUNCTIONS_BASE}/refreshGoogleToken`, {
+  const res = await fetch(`${API_BASE}/api/refreshGoogleToken`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
