@@ -19,14 +19,12 @@ import { onAuthStateChanged } from 'firebase/auth';
 
 interface AuthState {
   isAuthenticated: boolean;
-  needsReconnect: boolean;
   isLoading: boolean;
   error: string | null;
 }
 
 interface AuthContextValue extends AuthState {
   login: () => Promise<void>;
-  reconnect: () => Promise<void>;
   logout: () => Promise<void>;
   accessToken: string | null;
 }
@@ -36,108 +34,78 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     isAuthenticated: false,
-    needsReconnect: false,
     isLoading: true,
     error: null
   });
 
-  // Firebase auth state listener — this is the source of truth for login state.
-  // Firebase sessions persist across app restarts via IndexedDB.
+  // Firebase auth state listener — source of truth for login state.
+  // When Firebase has a user, silently refresh the Google access token
+  // via the Cloud Function (no popup needed).
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Firebase says we're logged in
         if (isTokenValid()) {
-          // Access token still valid
-          setState({
-            isAuthenticated: true,
-            needsReconnect: false,
-            isLoading: false,
-            error: null
-          });
+          setState({ isAuthenticated: true, isLoading: false, error: null });
         } else {
-          // Firebase session alive but access token expired —
-          // user is still "authenticated", just needs to tap reconnect
-          setState({
-            isAuthenticated: true,
-            needsReconnect: true,
-            isLoading: false,
-            error: null
-          });
+          // Firebase session alive, access token expired → silent refresh
+          try {
+            await refreshToken();
+            setState({ isAuthenticated: true, isLoading: false, error: null });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : '';
+            if (msg === 'no_refresh_token') {
+              // First-time user or refresh token lost — need full sign-in
+              clearToken();
+              setState({ isAuthenticated: false, isLoading: false, error: null });
+            } else {
+              // Temporary failure (network etc.) — stay authenticated, retry later
+              setState({ isAuthenticated: true, isLoading: false, error: null });
+            }
+          }
         }
       } else {
-        // No Firebase user — truly logged out
         clearToken();
-        setState({
-          isAuthenticated: false,
-          needsReconnect: false,
-          isLoading: false,
-          error: null
-        });
+        setState({ isAuthenticated: false, isLoading: false, error: null });
       }
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Periodic check: detect token expiry while app is open
+  // Periodic silent refresh when token expires while app is open
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (state.isAuthenticated && !state.needsReconnect && !isTokenValid()) {
-        setState((s) => ({ ...s, needsReconnect: true }));
+    let refreshing = false;
+    const interval = setInterval(async () => {
+      if (!state.isAuthenticated || isTokenValid() || refreshing) return;
+      refreshing = true;
+      try {
+        await refreshToken();
+      } catch {
+        // Will retry on next interval
+      } finally {
+        refreshing = false;
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [state.isAuthenticated, state.needsReconnect]);
+  }, [state.isAuthenticated]);
 
   const login = useCallback(async () => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
       await signIn();
-      setState({
-        isAuthenticated: true,
-        needsReconnect: false,
-        isLoading: false,
-        error: null
-      });
+      setState({ isAuthenticated: true, isLoading: false, error: null });
     } catch (err) {
       setState({
         isAuthenticated: false,
-        needsReconnect: false,
         isLoading: false,
         error: err instanceof Error ? err.message : 'Sign-in failed'
       });
     }
   }, []);
 
-  // Reconnect: get a fresh access token (requires user tap for popup)
-  const reconnect = useCallback(async () => {
-    setState((s) => ({ ...s, isLoading: true, error: null }));
-    try {
-      await refreshToken();
-      setState((s) => ({
-        ...s,
-        needsReconnect: false,
-        isLoading: false,
-        error: null
-      }));
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        isLoading: false,
-        error: err instanceof Error ? err.message : 'Reconnect failed'
-      }));
-    }
-  }, []);
-
   const logout = useCallback(async () => {
     await authSignOut();
-    setState({
-      isAuthenticated: false,
-      needsReconnect: false,
-      isLoading: false,
-      error: null
-    });
+    setState({ isAuthenticated: false, isLoading: false, error: null });
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
   }, []);
@@ -147,7 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         ...state,
         login,
-        reconnect,
         logout,
         accessToken: getAccessToken()
       }}

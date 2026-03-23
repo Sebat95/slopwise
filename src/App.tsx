@@ -9,7 +9,6 @@ import AddExpensePage from './pages/AddExpensePage';
 import BalancesPage from './pages/BalancesPage';
 import SettingsPage from './pages/SettingsPage';
 import LoadingSpinner from './components/LoadingSpinner';
-import ReconnectBanner from './components/ReconnectBanner';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -124,7 +123,6 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppProvider>
-          <ReconnectBanner />
           <AppRoutes />
         </AppProvider>
       </AuthProvider>
