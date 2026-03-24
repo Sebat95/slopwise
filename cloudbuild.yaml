@@ -68,6 +68,9 @@ steps:
       - --allow-unauthenticated
       - --port=8080
       - --execution-environment=gen2
+      - --memory=512Mi
+      - --min-instances=1
+      - --max-instances=2
       - --set-env-vars=NODE_ENV=production
       - --update-secrets=GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,TOKEN_ENCRYPTION_KEY=TOKEN_ENCRYPTION_KEY:latest
       - --quiet
