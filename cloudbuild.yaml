@@ -57,6 +57,7 @@ steps:
       - ${_IMAGE}:latest
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
     args:
       - run
       - deploy
