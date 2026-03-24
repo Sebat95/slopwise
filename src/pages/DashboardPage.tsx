@@ -61,7 +61,11 @@ export default function DashboardPage() {
   const confirmRename = async () => {
     const trimmed = draft.trim();
     if (trimmed && trimmed !== spreadsheetName) {
-      await renameSheet(trimmed);
+      try {
+        await renameSheet(trimmed);
+      } catch {
+        return;
+      }
     }
     setEditing(false);
   };
@@ -140,7 +144,9 @@ export default function DashboardPage() {
 
   const handleEdit = (id: string) => navigate(`/edit/${id}`);
   const handleDelete = (id: string) => {
-    if (window.confirm('Delete this expense?')) deleteExpense(id);
+    if (window.confirm('Delete this expense?')) {
+      void deleteExpense(id).catch(() => {});
+    }
   };
 
   if (isLoading && expenses.length === 0) {

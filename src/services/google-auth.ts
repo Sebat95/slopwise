@@ -5,10 +5,10 @@ import {
 import { auth } from './firebase';
 import type { GoogleTokenInfo, GoogleUserProfile } from '../types';
 
-const TOKEN_KEY = 'slopwise_token';
 const API_BASE = import.meta.env.VITE_FUNCTIONS_URL || '';
+let cachedToken: GoogleTokenInfo | null = null;
 
-// --- Token storage ---
+// --- Token cache ---
 
 function isValidToken(obj: unknown): obj is GoogleTokenInfo {
   if (!obj || typeof obj !== 'object') return false;
@@ -20,48 +20,32 @@ function isValidToken(obj: unknown): obj is GoogleTokenInfo {
   );
 }
 
-function getStoredToken(): GoogleTokenInfo | null {
-  try {
-    const raw = localStorage.getItem(TOKEN_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (!isValidToken(parsed)) {
-      localStorage.removeItem(TOKEN_KEY);
-      return null;
-    }
-    if (Date.now() >= parsed.expiry_time) return null;
-    return parsed;
-  } catch {
-    localStorage.removeItem(TOKEN_KEY);
+function getCachedToken(): GoogleTokenInfo | null {
+  if (!isValidToken(cachedToken)) {
+    cachedToken = null;
     return null;
   }
+  if (Date.now() >= cachedToken.expiry_time) {
+    cachedToken = null;
+    return null;
+  }
+  return cachedToken;
 }
 
 function storeToken(token: GoogleTokenInfo): void {
-  localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
+  cachedToken = token;
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  cachedToken = null;
 }
 
 export function getAccessToken(): string | null {
-  return getStoredToken()?.access_token ?? null;
+  return getCachedToken()?.access_token ?? null;
 }
 
 export function isTokenValid(): boolean {
-  return getStoredToken() !== null;
-}
-
-export function hasStoredToken(): boolean {
-  try {
-    const raw = localStorage.getItem(TOKEN_KEY);
-    if (!raw) return false;
-    const parsed: unknown = JSON.parse(raw);
-    return isValidToken(parsed);
-  } catch {
-    return false;
-  }
+  return getCachedToken() !== null;
 }
 
 // --- Google Identity Services code flow ---
@@ -172,7 +156,7 @@ export async function signIn(): Promise<GoogleTokenInfo> {
 // --- Silent refresh (no popup, no user interaction) ---
 
 export async function refreshToken(): Promise<GoogleTokenInfo> {
-  const existing = getStoredToken();
+  const existing = getCachedToken();
   if (existing) return existing;
 
   // Get Firebase ID token (persisted by Firebase via IndexedDB)

@@ -118,20 +118,3 @@ export function calculateSplits(
 
   return splits;
 }
-
-export function getBalanceBetween(
-  expenses: Expense[],
-  person1: string,
-  person2: string
-): number {
-  let balance = 0;
-  for (const expense of expenses) {
-    if (expense.paidBy === person1 && expense.splits[person2] !== undefined) {
-      balance -= expense.splits[person2];
-    }
-    if (expense.paidBy === person2 && expense.splits[person1] !== undefined) {
-      balance += expense.splits[person1];
-    }
-  }
-  return balance;
-}

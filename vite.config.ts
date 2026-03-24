@@ -32,7 +32,11 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Work around the current Workbox/Rollup terser hang during SW generation.
+        mode: 'development',
+        disableDevLogs: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        inlineWorkboxRuntime: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/accounts\.google\.com\/.*/i,

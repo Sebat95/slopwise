@@ -15,9 +15,100 @@ const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const MAX_ROWS = 10000;
 const SPLIT_TYPES: SplitType[] = ['equal', 'exact', 'percentage', 'shares'];
+const EXPENSE_META_SHEET = '_expense_meta';
+
+interface ExpenseMetaRow {
+  signature: string;
+  paidBy: string;
+  splitType: SplitType;
+}
 
 function emptySplitValuePresets(): SplitValuePresets {
   return { equal: {}, exact: {}, percentage: {}, shares: {} };
+}
+
+function isSplitType(value: string | undefined): value is SplitType {
+  return value !== undefined && SPLIT_TYPES.includes(value as SplitType);
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function formatMoney(value: number): string {
+  return roundMoney(value).toFixed(2);
+}
+
+function trimTrailingZeroSplits(values: number[]): number[] {
+  const next = values.map(roundMoney);
+  while (next.length > 0 && Math.abs(next[next.length - 1]) < 0.005) {
+    next.pop();
+  }
+  return next;
+}
+
+function buildExpenseSignature(
+  date: string,
+  description: string,
+  category: string,
+  cost: number,
+  currency: string,
+  splitValues: number[]
+): string {
+  return JSON.stringify({
+    date,
+    description,
+    category,
+    cost: formatMoney(cost),
+    currency,
+    splits: trimTrailingZeroSplits(splitValues).map(formatMoney)
+  });
+}
+
+function buildExpenseSignatureFromExpense(
+  expense: Expense,
+  members: string[]
+): string {
+  return buildExpenseSignature(
+    expense.date,
+    expense.description,
+    expense.category,
+    expense.cost,
+    expense.currency,
+    members.map((member) => expense.splits[member] ?? 0)
+  );
+}
+
+function buildExpenseSignatureFromRow(
+  row: string[],
+  memberColumns: Array<{ colIndex: number }>,
+  fallbackCurrency: string
+): string {
+  return buildExpenseSignature(
+    row[0] || '',
+    row[1] || '',
+    row[2] || 'General',
+    parseLooseNumber(row[3] || '0'),
+    row[4] || fallbackCurrency,
+    memberColumns.map((memberColumn) =>
+      parseLooseNumber(row[memberColumn.colIndex] || '0')
+    )
+  );
+}
+
+function buildExpenseMetaQueues(
+  metaRows: ExpenseMetaRow[]
+): Map<string, ExpenseMetaRow[]> {
+  const queues = new Map<string, ExpenseMetaRow[]>();
+  for (const metaRow of metaRows) {
+    const queue = queues.get(metaRow.signature);
+    if (queue) {
+      queue.push(metaRow);
+    } else {
+      queues.set(metaRow.signature, [metaRow]);
+    }
+  }
+  return queues;
 }
 
 function parseSplitValuePresets(raw: string | undefined): SplitValuePresets {
@@ -170,6 +261,24 @@ export async function createSpreadsheet(
               ]
             }
           ]
+        },
+        {
+          properties: { title: EXPENSE_META_SHEET, index: 3 },
+          data: [
+            {
+              startRow: 0,
+              startColumn: 0,
+              rowData: [
+                {
+                  values: [
+                    { userEnteredValue: { stringValue: 'Signature' } },
+                    { userEnteredValue: { stringValue: 'PaidBy' } },
+                    { userEnteredValue: { stringValue: 'SplitType' } }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       ]
     })
@@ -214,13 +323,14 @@ export async function getSpreadsheetInfo(
 
 export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
   const lastCol = columnLetter(FIXED_COLUMNS + 50);
-  const [expenseData, settingsData] = await Promise.all([
+  const [expenseData, settingsData, expenseMetaRows] = await Promise.all([
     apiRequest<{ values?: string[][] }>(
       `${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:${lastCol}${MAX_ROWS}`
-    ).catch(() => ({ values: undefined })),
+    ),
     apiRequest<{ values?: string[][] }>(
       `${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B10`
-    ).catch(() => ({ values: undefined }))
+    ).catch(() => ({ values: undefined })),
+    readExpenseMetadata(spreadsheetId).catch((): ExpenseMetaRow[] => [])
   ]);
 
   let currency = 'EUR';
@@ -234,10 +344,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     const splitRow = settingsData.values.find(
       (r) => r[0]?.toLowerCase() === 'lastsplittype'
     );
-    if (
-      splitRow?.[1] &&
-      ['equal', 'exact', 'percentage', 'shares'].includes(splitRow[1])
-    ) {
+    if (splitRow?.[1] && isSplitType(splitRow[1])) {
       lastSplitType = splitRow[1] as SplitType;
     }
     const valuesRow = settingsData.values.find(
@@ -254,18 +361,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     if (paidRow?.[1]) lastPaidBy = paidRow[1];
   }
 
-  if (!expenseData.values || expenseData.values.length <= 1) {
-    return {
-      members: [],
-      expenses: [],
-      currency,
-      lastSplitType,
-      lastPaidBy,
-      lastSplitValuePresets
-    };
-  }
-
-  const headers = expenseData.values[0];
+  const headers = expenseData.values?.[0] || [];
   const memberColumns = headers
     .slice(FIXED_COLUMNS)
     .map((name, idx) => ({
@@ -274,6 +370,19 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     }))
     .filter((c) => c.name.length > 0);
   const memberNames = memberColumns.map((c) => c.name);
+  const expenseMetaQueues = buildExpenseMetaQueues(expenseMetaRows);
+
+  if (!expenseData.values || expenseData.values.length <= 1) {
+    return {
+      members: memberNames,
+      expenses: [],
+      currency,
+      lastSplitType,
+      lastPaidBy,
+      lastSplitValuePresets
+    };
+  }
+
   const expenses: Expense[] = [];
 
   for (let i = 1; i < expenseData.values.length; i++) {
@@ -281,23 +390,36 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     if (!row || row.length < FIXED_COLUMNS || !row[0]) continue;
 
     const splits: Record<string, number> = {};
-    let paidBy = '';
+    let inferredPaidBy = '';
     let maxPositive = -Infinity;
 
     for (const memberColumn of memberColumns) {
       const val = parseLooseNumber(row[memberColumn.colIndex] || '0');
-      splits[memberColumn.name] = Math.round(val * 100) / 100;
+      splits[memberColumn.name] = roundMoney(val);
       if (val > maxPositive) {
         maxPositive = val;
-        paidBy = memberColumn.name;
+        inferredPaidBy = memberColumn.name;
       }
     }
 
+    const rowSignature = buildExpenseSignatureFromRow(
+      row,
+      memberColumns,
+      currency
+    );
+    const matchingMeta = expenseMetaQueues.get(rowSignature)?.shift();
+    const paidBy =
+      matchingMeta?.paidBy && memberNames.includes(matchingMeta.paidBy)
+        ? matchingMeta.paidBy
+        : inferredPaidBy;
+    const splitType = matchingMeta?.splitType || 'equal';
+
     // Force splits to sum to exactly zero — absorb any imbalance into payer
-    const splitSum =
-      Math.round(Object.values(splits).reduce((a, b) => a + b, 0) * 100) / 100;
+    const splitSum = roundMoney(
+      Object.values(splits).reduce((a, b) => a + b, 0)
+    );
     if (paidBy && splitSum !== 0) {
-      splits[paidBy] = Math.round((splits[paidBy] - splitSum) * 100) / 100;
+      splits[paidBy] = roundMoney(splits[paidBy] - splitSum);
     }
 
     const cost = parseLooseNumber(row[3] || '0');
@@ -312,7 +434,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       cost,
       currency: expCurrency,
       paidBy,
-      splitType: 'equal',
+      splitType,
       splits
     });
   }
@@ -354,9 +476,9 @@ function expenseToRow(expense: Expense, members: string[]): string[] {
     expense.date,
     expense.description,
     expense.category,
-    expense.cost.toFixed(2),
+    formatMoney(expense.cost),
     expense.currency,
-    ...members.map((m) => (expense.splits[m] ?? 0).toFixed(2))
+    ...members.map((m) => formatMoney(expense.splits[m] ?? 0))
   ];
 }
 
@@ -392,6 +514,7 @@ export async function writeAllExpenses(
     `${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:${lastCol}${MAX_ROWS}?valueInputOption=USER_ENTERED`,
     { method: 'PUT', body: JSON.stringify({ values: rows }) }
   );
+  await writeAllExpenseMetadata(spreadsheetId, expenses, members);
 }
 
 export async function addMemberColumn(
@@ -418,13 +541,6 @@ export async function renameMemberColumn(
   await apiRequest<unknown>(
     `${SHEETS_API}/${spreadsheetId}/values/Expenses!${colLetter}1?valueInputOption=USER_ENTERED`,
     { method: 'PUT', body: JSON.stringify({ values: [[newName]] }) }
-  );
-}
-
-export async function clearSheet(spreadsheetId: string): Promise<void> {
-  await apiRequest<unknown>(
-    `${SHEETS_API}/${spreadsheetId}/values/Expenses!A2:ZZ${MAX_ROWS}:clear`,
-    { method: 'POST', body: JSON.stringify({}) }
   );
 }
 
@@ -488,6 +604,71 @@ export async function readMemberProfiles(
     .map((r) => ({ name: r[0], email: r[1] || '', photoUrl: r[2] || '' }));
 }
 
+async function ensureExpenseMetaSheet(spreadsheetId: string): Promise<void> {
+  const info = await getSpreadsheetInfo(spreadsheetId);
+  if (!info.sheets.includes(EXPENSE_META_SHEET)) {
+    await apiRequest<unknown>(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+      method: 'POST',
+      body: JSON.stringify({
+        requests: [{ addSheet: { properties: { title: EXPENSE_META_SHEET } } }]
+      })
+    });
+    await apiRequest<unknown>(
+      `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A1:C1?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ values: [['Signature', 'PaidBy', 'SplitType']] })
+      }
+    );
+  }
+}
+
+async function readExpenseMetadata(
+  spreadsheetId: string
+): Promise<ExpenseMetaRow[]> {
+  const data = await apiRequest<{ values?: string[][] }>(
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A2:C${MAX_ROWS}`
+  ).catch(() => ({ values: undefined }));
+
+  if (!data.values) return [];
+
+  const metadata: ExpenseMetaRow[] = [];
+  for (const row of data.values) {
+    const signature = row[0]?.trim();
+    const paidBy = row[1]?.trim() || '';
+    const splitType = row[2]?.trim();
+    if (!signature || !isSplitType(splitType)) continue;
+    metadata.push({ signature, paidBy, splitType });
+  }
+
+  return metadata;
+}
+
+export async function writeAllExpenseMetadata(
+  spreadsheetId: string,
+  expenses: Expense[],
+  members: string[]
+): Promise<void> {
+  await ensureExpenseMetaSheet(spreadsheetId);
+  const rows = [
+    ['Signature', 'PaidBy', 'SplitType'],
+    ...expenses.map((expense) => [
+      buildExpenseSignatureFromExpense(expense, members),
+      expense.paidBy,
+      expense.splitType
+    ])
+  ];
+
+  await apiRequest<unknown>(
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A1:C${rows.length}?valueInputOption=USER_ENTERED`,
+    { method: 'PUT', body: JSON.stringify({ values: rows }) }
+  );
+  await apiRequest<unknown>(
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A${rows.length + 1}:C${MAX_ROWS}:clear`,
+    { method: 'POST', body: JSON.stringify({}) }
+  ).catch(() => {});
+}
+
 async function ensureMembersSheet(spreadsheetId: string): Promise<void> {
   const info = await getSpreadsheetInfo(spreadsheetId);
   if (!info.sheets.includes('_members')) {
@@ -522,49 +703,4 @@ export async function writeAllMemberProfiles(
     `${SHEETS_API}/${spreadsheetId}/values/_members!A${rows.length + 1}:C200:clear`,
     { method: 'POST', body: JSON.stringify({}) }
   ).catch(() => {});
-}
-
-export async function initializeSheetIfNeeded(
-  spreadsheetId: string,
-  members: string[],
-  currency: string
-): Promise<void> {
-  const info = await getSpreadsheetInfo(spreadsheetId);
-
-  if (!info.sheets.includes('_settings')) {
-    await apiRequest<unknown>(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
-      method: 'POST',
-      body: JSON.stringify({
-        requests: [{ addSheet: { properties: { title: '_settings' } } }]
-      })
-    });
-    await apiRequest<unknown>(
-      `${SHEETS_API}/${spreadsheetId}/values/_settings!A1:B1?valueInputOption=USER_ENTERED`,
-      {
-        method: 'PUT',
-        body: JSON.stringify({ values: [['currency', currency]] })
-      }
-    );
-  }
-
-  if (!info.sheets.includes('Expenses')) {
-    await apiRequest<unknown>(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
-      method: 'POST',
-      body: JSON.stringify({
-        requests: [{ addSheet: { properties: { title: 'Expenses' } } }]
-      })
-    });
-    const headers = [
-      'Date',
-      'Description',
-      'Category',
-      'Cost',
-      'Currency',
-      ...members
-    ];
-    await apiRequest<unknown>(
-      `${SHEETS_API}/${spreadsheetId}/values/Expenses!A1?valueInputOption=USER_ENTERED`,
-      { method: 'PUT', body: JSON.stringify({ values: [headers] }) }
-    );
-  }
 }

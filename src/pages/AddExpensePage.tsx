@@ -75,6 +75,24 @@ export default function AddExpensePage() {
     [getPresetValues, members]
   );
 
+  const buildSplitValues = useCallback(
+    (
+      type: SplitType,
+      involvedMembers: Iterable<string>
+    ): Record<string, number> => {
+      const nextValues = { ...getPresetValues(type) };
+      if (type === 'shares') {
+        for (const member of involvedMembers) {
+          if (!Number.isFinite(nextValues[member]) || nextValues[member] <= 0) {
+            nextValues[member] = 1;
+          }
+        }
+      }
+      return nextValues;
+    },
+    [getPresetValues]
+  );
+
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(todayStr());
@@ -90,8 +108,9 @@ export default function AddExpensePage() {
     setSplitTypeLocal(type);
     setLastSplitType(type);
     if (!isEdit) {
-      setSplitValues(getPresetValues(type));
-      setInvolved(getPresetInvolved(type));
+      const nextInvolved = getPresetInvolved(type);
+      setInvolved(nextInvolved);
+      setSplitValues(buildSplitValues(type, nextInvolved));
     }
   };
   const [splitValues, setSplitValues] = useState<Record<string, number>>({});
@@ -146,12 +165,13 @@ export default function AddExpensePage() {
       lastPaidBy && members.includes(lastPaidBy) ? lastPaidBy : members[0] || ''
     );
     setSplitTypeLocal(nextSplitType);
-    setSplitValues(getPresetValues(nextSplitType));
-    setInvolved(getPresetInvolved(nextSplitType));
+    const nextInvolved = getPresetInvolved(nextSplitType);
+    setInvolved(nextInvolved);
+    setSplitValues(buildSplitValues(nextSplitType, nextInvolved));
   }, [
+    buildSplitValues,
     currency,
     getPresetInvolved,
-    getPresetValues,
     isEdit,
     lastPaidBy,
     lastSplitType,
@@ -161,16 +181,23 @@ export default function AddExpensePage() {
   const cost = parseAmount(amount);
 
   const toggleInvolved = (m: string) => {
-    setInvolved((prev) => {
-      const next = new Set(prev);
-      if (next.has(m)) {
-        if (next.size <= 1) return next;
-        next.delete(m);
-      } else {
-        next.add(m);
-      }
-      return next;
-    });
+    const next = new Set(involved);
+    const isAdding = !next.has(m);
+
+    if (isAdding) {
+      next.add(m);
+    } else {
+      if (next.size <= 1) return;
+      next.delete(m);
+    }
+
+    setInvolved(next);
+    if (splitType === 'shares' && isAdding) {
+      setSplitValues((prev) => {
+        if ((prev[m] ?? 0) > 0) return prev;
+        return { ...prev, [m]: 1 };
+      });
+    }
   };
 
   const setSplitValue = (member: string, val: number) => {
@@ -217,6 +244,21 @@ export default function AddExpensePage() {
         setError(
           `Percentages must add up to 100% (currently ${total.toFixed(1)}%)`
         );
+        return;
+      }
+    }
+
+    if (splitType === 'shares') {
+      const shareValues = [...involved].map(
+        (member) => splitValues[member] || 0
+      );
+      if (shareValues.some((value) => value < 0)) {
+        setError('Shares cannot be negative');
+        return;
+      }
+      const totalShares = shareValues.reduce((sum, value) => sum + value, 0);
+      if (totalShares <= 0) {
+        setError('Enter at least one positive share');
         return;
       }
     }

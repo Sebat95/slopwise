@@ -2,6 +2,54 @@ import type { Expense } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { parseLooseNumber } from './format';
 
+const PAID_BY_COLUMN = '_slopwise_paid_by';
+const SPLIT_TYPE_COLUMN = '_slopwise_split_type';
+const RESERVED_COLUMNS = new Set([
+  'date',
+  'description',
+  'category',
+  'cost',
+  'currency',
+  PAID_BY_COLUMN,
+  SPLIT_TYPE_COLUMN
+]);
+
+function normalizeHeader(header: string): string {
+  return header.trim().toLowerCase();
+}
+
+function parseSplitType(
+  value: string | undefined
+): Expense['splitType'] | null {
+  if (
+    value === 'equal' ||
+    value === 'exact' ||
+    value === 'percentage' ||
+    value === 'shares'
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function inferPaidByFromSplits(
+  splits: Record<string, number>,
+  members: string[]
+): string {
+  let paidBy = '';
+  let maxPositive = -Infinity;
+
+  for (const member of members) {
+    const value = splits[member] ?? 0;
+    if (value > maxPositive) {
+      maxPositive = value;
+      paidBy = member;
+    }
+  }
+
+  return paidBy;
+}
+
 export function parseCompetitorCSV(csvText: string): {
   members: string[];
   expenses: Expense[];
@@ -10,29 +58,26 @@ export function parseCompetitorCSV(csvText: string): {
   if (lines.length < 2) return { members: [], expenses: [] };
 
   const headers = parseCSVLine(lines[0]);
-
-  const memberStartIdx = headers.findIndex((h) => {
-    const lower = h.toLowerCase().trim();
-    return (
-      lower !== 'date' &&
-      lower !== 'description' &&
-      lower !== 'category' &&
-      lower !== 'cost' &&
-      lower !== 'currency'
+  const headerIndex = new Map(
+    headers.map((header, index) => [normalizeHeader(header), index])
+  );
+  const paidByIndex = headerIndex.get(PAID_BY_COLUMN) ?? -1;
+  const splitTypeIndex = headerIndex.get(SPLIT_TYPE_COLUMN) ?? -1;
+  const memberColumns = headers
+    .map((header, index) => ({ header: header.trim(), index }))
+    .filter(
+      ({ header }) =>
+        header.length > 0 && !RESERVED_COLUMNS.has(normalizeHeader(header))
     );
-  });
 
-  if (memberStartIdx < 0) return { members: [], expenses: [] };
+  if (memberColumns.length === 0) return { members: [], expenses: [] };
 
-  const members = headers
-    .slice(memberStartIdx)
-    .map((h) => h.trim())
-    .filter(Boolean);
+  const members = memberColumns.map(({ header }) => header);
   const expenses: Expense[] = [];
 
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i]);
-    if (cols.length < memberStartIdx + 1) continue;
+    if (cols.length < 5) continue;
 
     const date = cols[0]?.trim() || '';
     const description = cols[1]?.trim() || '';
@@ -43,17 +88,21 @@ export function parseCompetitorCSV(csvText: string): {
     if (!date || cost === 0) continue;
 
     const splits: Record<string, number> = {};
-    let paidBy = '';
-    let maxPositive = -Infinity;
 
-    for (let j = 0; j < members.length; j++) {
-      const val = parseLooseNumber(cols[memberStartIdx + j]?.trim() || '0');
-      splits[members[j]] = val;
-      if (val > maxPositive) {
-        maxPositive = val;
-        paidBy = members[j];
-      }
+    for (const { header, index } of memberColumns) {
+      splits[header] = parseLooseNumber(cols[index]?.trim() || '0');
     }
+
+    const persistedPaidBy =
+      paidByIndex >= 0 ? cols[paidByIndex]?.trim() || '' : '';
+    const paidBy =
+      persistedPaidBy && members.includes(persistedPaidBy)
+        ? persistedPaidBy
+        : inferPaidByFromSplits(splits, members);
+    const splitType =
+      parseSplitType(
+        splitTypeIndex >= 0 ? cols[splitTypeIndex]?.trim() : undefined
+      ) || 'equal';
 
     expenses.push({
       id: uuidv4(),
@@ -63,7 +112,7 @@ export function parseCompetitorCSV(csvText: string): {
       cost,
       currency,
       paidBy,
-      splitType: 'equal',
+      splitType,
       splits
     });
   }
@@ -78,7 +127,9 @@ export function exportToCSV(expenses: Expense[], members: string[]): string {
     'Category',
     'Cost',
     'Currency',
-    ...members
+    ...members,
+    PAID_BY_COLUMN,
+    SPLIT_TYPE_COLUMN
   ];
   const lines = [headers.map(escapeCSV).join(',')];
 
@@ -89,7 +140,9 @@ export function exportToCSV(expenses: Expense[], members: string[]): string {
       expense.category,
       expense.cost.toFixed(2),
       expense.currency,
-      ...members.map((m) => (expense.splits[m] ?? 0).toFixed(2))
+      ...members.map((m) => (expense.splits[m] ?? 0).toFixed(2)),
+      expense.paidBy,
+      expense.splitType
     ];
     lines.push(row.map(escapeCSV).join(','));
   }

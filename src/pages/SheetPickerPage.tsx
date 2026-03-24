@@ -22,7 +22,7 @@ type View = 'list' | 'create' | 'import';
 
 export default function SheetPickerPage() {
   const navigate = useNavigate();
-  const { selectSpreadsheet, loadData, importExpenses, currency } = useApp();
+  const { connectSpreadsheet, importExpenses, currency } = useApp();
   const [view, setView] = useState<View>('list');
   const [sheets, setSheets] = useState<SpreadsheetInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,9 +58,9 @@ export default function SheetPickerPage() {
 
   const handleSelect = async (sheet: SpreadsheetInfo) => {
     setLoading(true);
+    setError(null);
     try {
-      selectSpreadsheet(sheet.id, sheet.name);
-      await loadData();
+      await connectSpreadsheet(sheet.id, sheet.name);
       navigate('/dashboard');
     } catch (err) {
       setError(
@@ -85,8 +85,7 @@ export default function SheetPickerPage() {
     setError(null);
     try {
       const id = await createSpreadsheet(newName.trim(), members, newCurrency);
-      selectSpreadsheet(id, newName.trim());
-      await loadData();
+      await connectSpreadsheet(id, newName.trim());
       navigate('/dashboard');
     } catch (err) {
       setError(
@@ -115,9 +114,8 @@ export default function SheetPickerPage() {
       const name =
         importFile.name.replace(/\.csv$/i, '') || 'Imported Expenses';
       const id = await createSpreadsheet(name, members, currency);
-      selectSpreadsheet(id, name);
-      await importExpenses(expenses, members);
-      await loadData();
+      await importExpenses(expenses, members, id);
+      await connectSpreadsheet(id, name);
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');

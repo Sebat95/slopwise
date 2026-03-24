@@ -60,7 +60,9 @@ export default function ExpensesPage() {
 
   const handleEdit = (id: string) => navigate(`/edit/${id}`);
   const handleDelete = (id: string) => {
-    if (window.confirm('Delete this expense?')) deleteExpense(id);
+    if (window.confirm('Delete this expense?')) {
+      void deleteExpense(id).catch(() => {});
+    }
   };
 
   return (

@@ -48,6 +48,10 @@ export default function SettingsPage() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [adding, setAdding] = useState(false);
+  const [linkingMember, setLinkingMember] = useState<string | null>(null);
+  const [memberActionError, setMemberActionError] = useState<string | null>(
+    null
+  );
 
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [memberDraft, setMemberDraft] = useState('');
@@ -60,10 +64,21 @@ export default function SettingsPage() {
   const confirmRenameMember = async () => {
     if (!editingMember) return;
     const trimmed = memberDraft.trim();
-    if (trimmed && trimmed !== editingMember) {
-      await renameMember(editingMember, trimmed);
+    if (!trimmed || trimmed === editingMember) {
+      setEditingMember(null);
+      setMemberActionError(null);
+      return;
     }
-    setEditingMember(null);
+
+    setMemberActionError(null);
+    try {
+      await renameMember(editingMember, trimmed);
+      setEditingMember(null);
+    } catch (err) {
+      setMemberActionError(
+        err instanceof Error ? err.message : 'Failed to rename member'
+      );
+    }
   };
 
   const cancelEditMember = () => {
@@ -76,14 +91,31 @@ export default function SettingsPage() {
     if (members.includes(name)) return;
 
     setAdding(true);
+    setMemberActionError(null);
     try {
       await addMember(name);
       setShowAddMember(false);
       setNewMemberName('');
-    } catch {
-      // ignore
+    } catch (err) {
+      setMemberActionError(
+        err instanceof Error ? err.message : 'Failed to add member'
+      );
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleLinkMember = async (memberName: string) => {
+    setLinkingMember(memberName);
+    setMemberActionError(null);
+    try {
+      await linkMemberToGoogle(memberName);
+    } catch (err) {
+      setMemberActionError(
+        err instanceof Error ? err.message : 'Failed to link profile'
+      );
+    } finally {
+      setLinkingMember(null);
     }
   };
 
@@ -182,6 +214,11 @@ export default function SettingsPage() {
               <UserPlus size={14} /> Add
             </button>
           </div>
+          {memberActionError && (
+            <p className="text-danger bg-danger/10 mb-3 rounded-xl p-3 text-sm">
+              {memberActionError}
+            </p>
+          )}
           <div className="bg-bg-card border-border/50 divide-border/30 divide-y rounded-xl border">
             {members.length === 0 && isLoading && (
               <div className="text-text-muted p-4 text-center text-sm">
@@ -242,19 +279,26 @@ export default function SettingsPage() {
                   </div>
                   {!isEditing && (
                     <button
-                      onClick={() => linkMemberToGoogle(m)}
+                      onClick={() => void handleLinkMember(m)}
+                      disabled={linkingMember === m}
                       className={`shrink-0 rounded-lg p-1.5 text-xs transition-colors ${
                         profile?.email
                           ? 'text-positive hover:bg-positive/10'
                           : 'text-text-muted hover:text-primary hover:bg-primary/10'
-                      }`}
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
                       title={
-                        profile?.email
-                          ? `Linked to ${profile.email}`
-                          : 'Link your Google account'
+                        linkingMember === m
+                          ? 'Linking profile...'
+                          : profile?.email
+                            ? `Linked to ${profile.email}`
+                            : 'Link your Google account'
                       }
                     >
-                      <Link size={14} />
+                      {linkingMember === m ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <Link size={14} />
+                      )}
                     </button>
                   )}
                 </div>
@@ -278,7 +322,7 @@ export default function SettingsPage() {
                 Export CSV
               </p>
               <p className="text-text-muted text-xs">
-                Splitwise-compatible format
+                Preserves Slopwise payer and split metadata
               </p>
             </div>
           </button>
@@ -315,6 +359,11 @@ export default function SettingsPage() {
             autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAddMember()}
           />
+          {memberActionError && (
+            <p className="text-danger bg-danger/10 rounded-xl p-3 text-sm">
+              {memberActionError}
+            </p>
+          )}
           <button
             onClick={handleAddMember}
             disabled={

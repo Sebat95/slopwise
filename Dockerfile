@@ -1,4 +1,4 @@
-### Build Stage
+### FE/MAIN-APP: Build Stage
 FROM node:25-alpine AS build
 WORKDIR /app
 # delete legacy yarn and install new with corepack
@@ -34,10 +34,12 @@ COPY . .
 # build frontend
 RUN yarn run build
 
-### Serve Stage
+### FE/MAIN-APP: Serve Stage
 FROM node:25-alpine AS serve
 WORKDIR /app
 
+
+### BE/AUTH-SERVERß
 # Install server dependencies
 COPY server/package.json ./
 RUN npm install --production
