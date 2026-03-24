@@ -2,8 +2,11 @@
 FROM node:25-alpine AS build
 WORKDIR /app
 
-# use repo-pinned yarn via corepack
-RUN corepack enable && corepack prepare yarn@4.12.0 --activate
+# delete legacy yarn and install new with corepack
+RUN rm -rf /opt/yarn* /usr/local/bin/yarn* && \
+    npm install -g corepack@latest && \
+    corepack enable && \
+    corepack prepare yarn@4.12.0 --activate
 
 # set args
 ARG VITE_FIREBASE_API_KEY
