@@ -56,16 +56,13 @@ app.post('/api/exchangeCode', async (req, res) => {
     }
 
     if (tokens.refresh_token) {
-      await getFirestore()
-        .collection('user_tokens')
-        .doc(firebaseUser.uid)
-        .set(
-          {
-            refresh_token: tokens.refresh_token,
-            updated_at: new Date().toISOString()
-          },
-          { merge: true }
-        );
+      await getFirestore().collection('user_tokens').doc(firebaseUser.uid).set(
+        {
+          refresh_token: tokens.refresh_token,
+          updated_at: new Date().toISOString()
+        },
+        { merge: true }
+      );
     }
 
     const customToken = await getAuth().createCustomToken(firebaseUser.uid);
@@ -117,16 +114,13 @@ app.post('/api/refreshGoogleToken', async (req, res) => {
     }
 
     if (credentials.refresh_token) {
-      await getFirestore()
-        .collection('user_tokens')
-        .doc(decoded.uid)
-        .set(
-          {
-            refresh_token: credentials.refresh_token,
-            updated_at: new Date().toISOString()
-          },
-          { merge: true }
-        );
+      await getFirestore().collection('user_tokens').doc(decoded.uid).set(
+        {
+          refresh_token: credentials.refresh_token,
+          updated_at: new Date().toISOString()
+        },
+        { merge: true }
+      );
     }
 
     res.json({

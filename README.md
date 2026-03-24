@@ -145,6 +145,7 @@ cd server && npm install && GOOGLE_CLIENT_ID=xxx GOOGLE_CLIENT_SECRET=xxx node i
 The project includes a `Dockerfile` and `cloudbuild.yaml` for automated deployment.
 
 **Secrets needed in GCP Secret Manager:**
+
 - All `VITE_FIREBASE_*` secrets (build-time)
 - `GOOGLE_CLIENT_ID` (build-time + runtime)
 - `GOOGLE_CLIENT_SECRET` (runtime only)
@@ -155,10 +156,10 @@ The `cloudbuild.yaml` handles passing build args and setting Cloud Run env vars 
 
 The app stores data in competitor-compatible CSV format:
 
-| Date       | Description | Category     | Cost  | Currency | Alice  | Bob    | Charlie |
-| ---------- | ----------- | ------------ | ----- | -------- | ------ | ------ | ------- |
-| 2024-01-15 | Dinner      | Dining out   | 60.00 | EUR      | 40.00  | -20.00 | -20.00  |
-| 2024-01-16 | Taxi        | Transport    | 30.00 | EUR      | -15.00 | 15.00  | 0.00    |
+| Date       | Description | Category   | Cost  | Currency | Alice  | Bob    | Charlie |
+| ---------- | ----------- | ---------- | ----- | -------- | ------ | ------ | ------- |
+| 2024-01-15 | Dinner      | Dining out | 60.00 | EUR      | 40.00  | -20.00 | -20.00  |
+| 2024-01-16 | Taxi        | Transport  | 30.00 | EUR      | -15.00 | 15.00  | 0.00    |
 
 Each member column shows their **net** for that expense:
 
@@ -167,6 +168,7 @@ Each member column shows their **net** for that expense:
 - **Zero** = not involved or fully settled
 
 Additional sheet tabs:
+
 - **`_settings`** — currency, last split type, last payer
 - **`_members`** — member name, linked email, profile photo URL
 
