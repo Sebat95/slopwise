@@ -177,7 +177,7 @@ function setSecurityHeaders(res) {
   );
 }
 
-app.get('*', (_req, res) => {
+app.get('{*path}', (_req, res) => {
   setSecurityHeaders(res);
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(STATIC_DIR, 'index.html'));
