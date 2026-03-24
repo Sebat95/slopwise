@@ -158,7 +158,7 @@ interface ApiErrorResponse {
 }
 
 async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}/api/googleProxy`, {
+  const res = await fetch(`${API_BASE}/googleProxy`, {
     method: 'POST',
     credentials: 'include',
     cache: 'no-store',

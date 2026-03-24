@@ -123,7 +123,7 @@ export async function signIn(): Promise<void> {
   await waitForGsi();
   const code = await requestAuthCode(clientId);
 
-  const res = await fetch(`${API_BASE}/api/exchangeCode`, {
+  const res = await fetch(`${API_BASE}/exchangeCode`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -143,7 +143,7 @@ export async function signIn(): Promise<void> {
       throw new Error('Could not establish a secure session');
     }
 
-    const sessionRes = await fetch(`${API_BASE}/api/sessionLogin`, {
+    const sessionRes = await fetch(`${API_BASE}/sessionLogin`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -161,7 +161,7 @@ export async function signIn(): Promise<void> {
 }
 
 export async function getSession(): Promise<SessionResponse> {
-  const res = await fetch(`${API_BASE}/api/session`, {
+  const res = await fetch(`${API_BASE}/session`, {
     credentials: 'include',
     cache: 'no-store'
   });
@@ -181,7 +181,7 @@ export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
 }
 
 export async function signOut(): Promise<void> {
-  await fetch(`${API_BASE}/api/sessionLogout`, {
+  await fetch(`${API_BASE}/sessionLogout`, {
     method: 'POST',
     credentials: 'include'
   }).catch(() => {});
