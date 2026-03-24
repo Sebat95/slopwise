@@ -1,23 +1,17 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import ExpenseCard from '../components/ExpenseCard';
 import EmptyState from '../components/EmptyState';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Search, Receipt, PlusCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { getCategoryEmoji, formatCurrency } from '../utils/format';
 
 export default function ExpensesPage() {
   const navigate = useNavigate();
-  const { expenses, currency, isLoading, loadData, deleteExpense } = useApp();
-
-  useEffect(() => {
-    if (expenses.length === 0 && !isLoading) {
-      loadData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { expenses, currency, isLoading, deleteExpense } = useApp();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -64,6 +58,14 @@ export default function ExpensesPage() {
       void deleteExpense(id).catch(() => {});
     }
   };
+
+  if (isLoading && expenses.length === 0) {
+    return (
+      <Layout>
+        <LoadingSpinner text="Loading expenses..." />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

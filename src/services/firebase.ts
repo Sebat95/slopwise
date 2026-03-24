@@ -1,8 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import {
-  browserLocalPersistence,
+  inMemoryPersistence,
   getAuth,
-  GoogleAuthProvider,
   setPersistence
 } from 'firebase/auth';
 
@@ -17,13 +16,4 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-void setPersistence(auth, browserLocalPersistence).catch(() => {});
-
-export const googleProvider = new GoogleAuthProvider();
-// Add required scopes for the app to function
-googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
-googleProvider.addScope(
-  'https://www.googleapis.com/auth/drive.metadata.readonly'
-);
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
+void setPersistence(auth, inMemoryPersistence).catch(() => {});

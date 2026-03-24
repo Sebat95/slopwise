@@ -1,4 +1,10 @@
 node_modules
+server/node_modules
+dist
+.cursor
+.vscode
+.DS_Store
+*.log
 Dockerfile
 .dockerignore
 .git

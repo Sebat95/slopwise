@@ -3,49 +3,18 @@ import {
   signOut as firebaseSignOut
 } from 'firebase/auth';
 import { auth } from './firebase';
-import type { GoogleTokenInfo, GoogleUserProfile } from '../types';
+import type { GoogleUserProfile } from '../types';
 
-const API_BASE = import.meta.env.VITE_FUNCTIONS_URL || '';
-let cachedToken: GoogleTokenInfo | null = null;
+const API_BASE = '/api';
+export const AUTH_EXPIRED_EVENT = 'slopwise:auth-expired';
 
-// --- Token cache ---
-
-function isValidToken(obj: unknown): obj is GoogleTokenInfo {
-  if (!obj || typeof obj !== 'object') return false;
-  const t = obj as Record<string, unknown>;
-  return (
-    typeof t.access_token === 'string' &&
-    typeof t.expiry_time === 'number' &&
-    typeof t.token_type === 'string'
-  );
+interface SessionResponse {
+  authenticated: boolean;
+  user: GoogleUserProfile | null;
 }
 
-function getCachedToken(): GoogleTokenInfo | null {
-  if (!isValidToken(cachedToken)) {
-    cachedToken = null;
-    return null;
-  }
-  if (Date.now() >= cachedToken.expiry_time) {
-    cachedToken = null;
-    return null;
-  }
-  return cachedToken;
-}
-
-function storeToken(token: GoogleTokenInfo): void {
-  cachedToken = token;
-}
-
-export function clearToken(): void {
-  cachedToken = null;
-}
-
-export function getAccessToken(): string | null {
-  return getCachedToken()?.access_token ?? null;
-}
-
-export function isTokenValid(): boolean {
-  return getCachedToken() !== null;
+interface ExchangeCodeResponse {
+  firebase_token: string;
 }
 
 // --- Google Identity Services code flow ---
@@ -59,6 +28,8 @@ declare global {
             client_id: string;
             scope: string;
             ux_mode: string;
+            access_type?: string;
+            prompt?: string;
             callback: (response: { code?: string; error?: string }) => void;
           }) => { requestCode: () => void };
         };
@@ -97,6 +68,8 @@ function requestAuthCode(clientId: string): Promise<string> {
         'https://www.googleapis.com/auth/userinfo.email'
       ].join(' '),
       ux_mode: 'popup',
+      access_type: 'offline',
+      prompt: 'consent',
       callback: (response) => {
         if (response.error) {
           reject(new Error(response.error));
@@ -113,104 +86,105 @@ function requestAuthCode(clientId: string): Promise<string> {
   });
 }
 
-// --- Sign in (one popup, then silent forever) ---
+async function readApiError(
+  res: Response,
+  fallbackMessage: string
+): Promise<string> {
+  const payload = await res.json().catch(() => null);
+  const message =
+    payload &&
+    typeof payload === 'object' &&
+    'error' in payload &&
+    (typeof payload.error === 'string' ||
+      (typeof payload.error === 'object' &&
+        payload.error !== null &&
+        'message' in payload.error &&
+        typeof payload.error.message === 'string'))
+      ? typeof payload.error === 'string'
+        ? payload.error
+        : payload.error.message
+      : null;
+  return message || fallbackMessage;
+}
 
-export async function signIn(): Promise<GoogleTokenInfo> {
+export function notifySessionExpired(): void {
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+}
+
+export function onSessionExpired(listener: () => void): () => void {
+  window.addEventListener(AUTH_EXPIRED_EVENT, listener);
+  return () => window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
+}
+
+export async function signIn(): Promise<void> {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) throw new Error('Missing VITE_GOOGLE_CLIENT_ID');
 
   await waitForGsi();
-
-  // Get auth code from Google (popup)
   const code = await requestAuthCode(clientId);
 
-  // Exchange code on server → access token + refresh token stored + Firebase custom token
   const res = await fetch(`${API_BASE}/api/exchangeCode`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code })
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Exchange failed' }));
-    throw new Error(err.error || 'Sign-in failed');
+    throw new Error(await readApiError(res, 'Sign-in failed'));
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as ExchangeCodeResponse;
 
-  // Sign into Firebase with the custom token (establishes persistent session)
-  await signInWithCustomToken(auth, data.firebase_token);
+  try {
+    await signInWithCustomToken(auth, data.firebase_token);
+    const idToken = await auth.currentUser?.getIdToken();
+    if (!idToken) {
+      throw new Error('Could not establish a secure session');
+    }
 
-  const tokenInfo: GoogleTokenInfo = {
-    access_token: data.access_token,
-    expires_in: data.expires_in || 3600,
-    token_type: 'Bearer',
-    scope: 'https://www.googleapis.com/auth/spreadsheets',
-    expiry_time: Date.now() + (data.expires_in || 3600) * 1000 - 60000
-  };
+    const sessionRes = await fetch(`${API_BASE}/api/sessionLogin`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken })
+    });
 
-  storeToken(tokenInfo);
-  return tokenInfo;
+    if (!sessionRes.ok) {
+      throw new Error(
+        await readApiError(sessionRes, 'Could not establish a secure session')
+      );
+    }
+  } finally {
+    await firebaseSignOut(auth).catch(() => {});
+  }
 }
 
-// --- Silent refresh (no popup, no user interaction) ---
-
-export async function refreshToken(): Promise<GoogleTokenInfo> {
-  const existing = getCachedToken();
-  if (existing) return existing;
-
-  // Get Firebase ID token (persisted by Firebase via IndexedDB)
-  const user = auth.currentUser;
-  if (!user) throw new Error('Not authenticated');
-
-  const idToken = await user.getIdToken(true);
-
-  const res = await fetch(`${API_BASE}/api/refreshGoogleToken`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`
-    }
+export async function getSession(): Promise<SessionResponse> {
+  const res = await fetch(`${API_BASE}/api/session`, {
+    credentials: 'include',
+    cache: 'no-store'
   });
-
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Refresh failed' }));
-    if (err.error === 'no_refresh_token') {
-      throw new Error('no_refresh_token');
-    }
-    throw new Error(err.error || 'Token refresh failed');
+    throw new Error(await readApiError(res, 'Failed to restore session'));
   }
-
-  const data = await res.json();
-
-  const tokenInfo: GoogleTokenInfo = {
-    access_token: data.access_token,
-    expires_in: data.expires_in || 3600,
-    token_type: 'Bearer',
-    scope: 'https://www.googleapis.com/auth/spreadsheets',
-    expiry_time: Date.now() + (data.expires_in || 3600) * 1000 - 60000
+  const data = (await res.json()) as SessionResponse;
+  return {
+    authenticated: Boolean(data.authenticated),
+    user: data.user ?? null
   };
-
-  storeToken(tokenInfo);
-  return tokenInfo;
 }
-
-// --- User profile ---
 
 export async function fetchUserProfile(): Promise<GoogleUserProfile | null> {
-  if (auth.currentUser) {
-    return {
-      name: auth.currentUser.displayName || '',
-      email: auth.currentUser.email || '',
-      picture: auth.currentUser.photoURL || ''
-    };
-  }
-  return null;
+  const session = await getSession();
+  return session.user;
 }
 
-// --- Sign out ---
-
 export async function signOut(): Promise<void> {
-  clearToken();
+  await fetch(`${API_BASE}/api/sessionLogout`, {
+    method: 'POST',
+    credentials: 'include'
+  }).catch(() => {});
   await firebaseSignOut(auth);
+  notifySessionExpired();
 }

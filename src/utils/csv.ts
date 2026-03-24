@@ -50,6 +50,23 @@ function inferPaidByFromSplits(
   return paidBy;
 }
 
+function resolvePaidBy(
+  persistedPaidBy: string,
+  splits: Record<string, number>,
+  members: string[]
+): string {
+  if (persistedPaidBy && members.includes(persistedPaidBy)) {
+    return persistedPaidBy;
+  }
+  return inferPaidByFromSplits(splits, members);
+}
+
+function resolveSplitType(
+  persistedSplitType: string | undefined
+): Expense['splitType'] {
+  return parseSplitType(persistedSplitType) || 'equal';
+}
+
 export function parseCompetitorCSV(csvText: string): {
   members: string[];
   expenses: Expense[];
@@ -63,6 +80,8 @@ export function parseCompetitorCSV(csvText: string): {
   );
   const paidByIndex = headerIndex.get(PAID_BY_COLUMN) ?? -1;
   const splitTypeIndex = headerIndex.get(SPLIT_TYPE_COLUMN) ?? -1;
+  const hasPaidByMetadata = paidByIndex >= 0;
+  const hasSplitTypeMetadata = splitTypeIndex >= 0;
   const memberColumns = headers
     .map((header, index) => ({ header: header.trim(), index }))
     .filter(
@@ -93,16 +112,16 @@ export function parseCompetitorCSV(csvText: string): {
       splits[header] = parseLooseNumber(cols[index]?.trim() || '0');
     }
 
-    const persistedPaidBy =
-      paidByIndex >= 0 ? cols[paidByIndex]?.trim() || '' : '';
-    const paidBy =
-      persistedPaidBy && members.includes(persistedPaidBy)
-        ? persistedPaidBy
-        : inferPaidByFromSplits(splits, members);
-    const splitType =
-      parseSplitType(
-        splitTypeIndex >= 0 ? cols[splitTypeIndex]?.trim() : undefined
-      ) || 'equal';
+    // Third-party exports do not include Slopwise metadata, so keep a
+    // deterministic fallback for payer and split type when those columns
+    // are absent.
+    const persistedPaidBy = hasPaidByMetadata
+      ? cols[paidByIndex]?.trim() || ''
+      : '';
+    const paidBy = resolvePaidBy(persistedPaidBy, splits, members);
+    const splitType = resolveSplitType(
+      hasSplitTypeMetadata ? cols[splitTypeIndex]?.trim() : undefined
+    );
 
     expenses.push({
       id: uuidv4(),

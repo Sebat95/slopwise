@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   useRef,
   useMemo,
   type ReactNode
@@ -117,7 +118,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     lastSplitType: 'equal',
     lastPaidBy: '',
     lastSplitValuePresets: emptySplitValuePresets(),
-    isLoading: false,
+    isLoading: Boolean(getSsId()),
     isSyncing: false,
     error: null,
     lastSync: null
@@ -126,6 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const latestReadRequestIdRef = useRef(0);
+  const hydratedSpreadsheetIdRef = useRef<string | null>(null);
 
   const readSpreadsheetSnapshot = useCallback(async (spreadsheetId: string) => {
     const [data, profiles] = await Promise.all([
@@ -156,6 +158,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { data, profileMap } = await readSpreadsheetSnapshot(id);
         localStorage.setItem('slopwise_spreadsheet_id', id);
         localStorage.setItem('slopwise_spreadsheet_name', name);
+        hydratedSpreadsheetIdRef.current = id;
 
         const nextState: AppState = {
           ...stateRef.current,
@@ -198,6 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const { data, profileMap } = await readSpreadsheetSnapshot(ssId);
       if (!isActiveReadRequest(requestId)) return;
+      hydratedSpreadsheetIdRef.current = ssId;
 
       setState((s) => ({
         ...s,
@@ -222,6 +226,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
     }
   }, [beginReadRequest, isActiveReadRequest, readSpreadsheetSnapshot]);
+
+  useEffect(() => {
+    const ssId = state.spreadsheetId;
+    if (!ssId) {
+      hydratedSpreadsheetIdRef.current = null;
+      return;
+    }
+    if (hydratedSpreadsheetIdRef.current === ssId) return;
+    hydratedSpreadsheetIdRef.current = ssId;
+    void loadData();
+  }, [loadData, state.spreadsheetId]);
 
   const addExpense = useCallback(async (expense: Omit<Expense, 'id'>) => {
     const ssId = getSsId();
@@ -714,6 +729,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const disconnect = useCallback(() => {
     beginReadRequest();
+    hydratedSpreadsheetIdRef.current = null;
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
     setState((s) => ({

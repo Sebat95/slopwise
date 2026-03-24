@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import EmptyState from '../components/EmptyState';
+import LoadingSpinner from '../components/LoadingSpinner';
 import SpendingChart from '../components/SpendingChart';
 import { calculateNetBalances, simplifyDebts } from '../utils/balance';
 import { formatCurrency } from '../utils/format';
@@ -16,14 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function BalancesPage() {
-  const { members, expenses, currency, isLoading, loadData } = useApp();
-
-  useEffect(() => {
-    if (expenses.length === 0 && !isLoading) {
-      loadData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { members, expenses, currency, isLoading } = useApp();
 
   const { minDate, maxDate } = useMemo(() => {
     if (expenses.length === 0) return { minDate: '', maxDate: '' };
@@ -96,6 +90,14 @@ export default function BalancesPage() {
   );
 
   const isRangeModified = dateFrom !== null || dateTo !== null;
+
+  if (isLoading && members.length === 0 && expenses.length === 0) {
+    return (
+      <Layout>
+        <LoadingSpinner text="Loading stats..." />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
@@ -44,13 +44,6 @@ export default function DashboardPage() {
   const [settleTo, setSettleTo] = useState('');
   const [settleAmount, setSettleAmount] = useState('');
   const [settling, setSettling] = useState(false);
-
-  useEffect(() => {
-    if (expenses.length === 0 && !isLoading) {
-      loadData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const startEditing = () => {
     setDraft(spreadsheetName || '');

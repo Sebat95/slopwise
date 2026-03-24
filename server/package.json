@@ -2,6 +2,12 @@
   "name": "slopwise-server",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
     "express": "5.2.1",
     "firebase-admin": "13.7.0",

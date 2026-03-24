@@ -7,10 +7,11 @@ import type {
   SplitValuePresets
 } from '../types';
 import { FIXED_COLUMNS } from '../types';
-import { getAccessToken } from './google-auth';
+import { notifySessionExpired } from './google-auth';
 import { normalizeCategory, parseLooseNumber } from '../utils/format';
 import { v4 as uuidv4 } from 'uuid';
 
+const API_BASE = '/api';
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const MAX_ROWS = 10000;
@@ -152,29 +153,34 @@ function columnLetter(index: number): string {
   return result;
 }
 
-function authHeaders(): HeadersInit {
-  const token = getAccessToken();
-  if (!token) throw new Error('Not authenticated');
-  return {
-    Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  };
-}
-
 interface ApiErrorResponse {
-  error?: { message?: string };
+  error?: { message?: string } | string;
 }
 
 async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...options,
-    headers: { ...authHeaders(), ...options?.headers }
+  const res = await fetch(`${API_BASE}/api/googleProxy`, {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url,
+      method: options?.method || 'GET',
+      body: typeof options?.body === 'string' ? options.body : null
+    })
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      notifySessionExpired();
+    }
     const body: ApiErrorResponse = await res
       .json()
       .catch(() => ({ error: { message: res.statusText } }));
-    throw new Error(body.error?.message || `API error: ${res.status}`);
+    const message =
+      typeof body.error === 'string'
+        ? body.error
+        : body.error?.message || `API error: ${res.status}`;
+    throw new Error(message);
   }
   return res.json() as Promise<T>;
 }

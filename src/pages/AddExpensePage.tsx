@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
-import { CATEGORIES, CURRENCIES, type SplitType } from '../types';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { CATEGORIES, CURRENCIES, type Expense, type SplitType } from '../types';
 import { calculateSplits } from '../utils/balance';
 import {
   todayStr,
@@ -30,7 +31,6 @@ export default function AddExpensePage() {
     lastSplitType,
     lastPaidBy,
     isLoading,
-    loadData,
     addExpense,
     updateExpense,
     setLastSplitType,
@@ -38,13 +38,6 @@ export default function AddExpensePage() {
     lastSplitValuePresets,
     setLastSplitValuesForType
   } = useApp();
-
-  useEffect(() => {
-    if (members.length === 0 && !isLoading) {
-      loadData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const existing = useMemo(
     () => (editId ? expenses.find((e) => e.id === editId) : undefined),
@@ -119,45 +112,46 @@ export default function AddExpensePage() {
   const [error, setError] = useState<string | null>(null);
   const hasInitializedNewExpense = useRef(false);
 
-  useEffect(() => {
-    if (!existing) return;
-    setDescription(existing.description);
-    setAmount(existing.cost.toString());
-    setDate(existing.date);
-    setCategory(existing.category);
-    setExpCurrency(existing.currency);
-    setPaidByLocal(existing.paidBy);
-    setSplitTypeLocal(existing.splitType);
+  // The form intentionally hydrates editable local state from async sheet data.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const applyExistingExpense = useCallback((expense: Expense) => {
+    setDescription(expense.description);
+    setAmount(expense.cost.toString());
+    setDate(expense.date);
+    setCategory(expense.category);
+    setExpCurrency(expense.currency);
+    setPaidByLocal(expense.paidBy);
+    setSplitTypeLocal(expense.splitType);
 
     const involvedSet = new Set<string>();
     const values: Record<string, number> = {};
-    for (const [m, net] of Object.entries(existing.splits)) {
-      if (Math.abs(net) > 0.001 || m === existing.paidBy) {
+    for (const [m, net] of Object.entries(expense.splits)) {
+      if (Math.abs(net) > 0.001 || m === expense.paidBy) {
         involvedSet.add(m);
       }
-      const share = existing.paidBy === m ? existing.cost - net : -net;
+      const share = expense.paidBy === m ? expense.cost - net : -net;
       if (share > 0) values[m] = Math.round(share * 100) / 100;
     }
-    if (involvedSet.size === 0) involvedSet.add(existing.paidBy);
+    if (involvedSet.size === 0) involvedSet.add(expense.paidBy);
     setInvolved(involvedSet);
 
-    if (existing.splitType === 'exact') {
+    if (expense.splitType === 'exact') {
       setSplitValues(values);
-    } else if (existing.splitType === 'percentage' && existing.cost > 0) {
-      const pcts: Record<string, number> = {};
+    } else if (expense.splitType === 'percentage' && expense.cost > 0) {
+      const percentages: Record<string, number> = {};
       for (const [m, v] of Object.entries(values)) {
-        pcts[m] = Math.round((v / existing.cost) * 10000) / 100;
+        percentages[m] = Math.round((v / expense.cost) * 10000) / 100;
       }
-      setSplitValues(pcts);
-    } else if (existing.splitType === 'shares') {
+      setSplitValues(percentages);
+    } else if (expense.splitType === 'shares') {
       setSplitValues(values);
+    } else {
+      setSplitValues({});
     }
-  }, [existing]);
+  }, []);
 
-  useEffect(() => {
-    if (isEdit || hasInitializedNewExpense.current || members.length === 0)
-      return;
-
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const initializeNewExpenseForm = useCallback(() => {
     hasInitializedNewExpense.current = true;
     const nextSplitType = lastSplitType;
     setExpCurrency(currency);
@@ -172,13 +166,36 @@ export default function AddExpensePage() {
     buildSplitValues,
     currency,
     getPresetInvolved,
-    isEdit,
     lastPaidBy,
     lastSplitType,
     members
   ]);
 
+  useEffect(() => {
+    if (!existing) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    applyExistingExpense(existing);
+  }, [applyExistingExpense, existing]);
+
+  useEffect(() => {
+    if (isEdit || hasInitializedNewExpense.current || members.length === 0)
+      return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    initializeNewExpenseForm();
+  }, [initializeNewExpenseForm, isEdit, members.length]);
+
   const cost = parseAmount(amount);
+
+  if (isLoading && members.length === 0) {
+    return (
+      <Layout showNav={false}>
+        <LoadingSpinner
+          text={editId ? 'Loading expense...' : 'Loading members...'}
+        />
+      </Layout>
+    );
+  }
 
   const toggleInvolved = (m: string) => {
     const next = new Set(involved);

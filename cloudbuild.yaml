@@ -21,6 +21,8 @@ availableSecrets:
       env: GOOGLE_CLIENT_ID
     - versionName: projects/468513744130/secrets/GOOGLE_CLIENT_SECRET/versions/latest
       env: GOOGLE_CLIENT_SECRET
+    - versionName: projects/468513744130/secrets/TOKEN_ENCRYPTION_KEY/versions/latest
+      env: TOKEN_ENCRYPTION_KEY
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -28,7 +30,7 @@ steps:
     args:
       - -c
       - |
-        docker build \
+        docker build --pull \
           --build-arg VITE_FIREBASE_API_KEY=$$VITE_FIREBASE_API_KEY \
           --build-arg VITE_FIREBASE_AUTH_DOMAIN=$$VITE_FIREBASE_AUTH_DOMAIN \
           --build-arg VITE_FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID \
@@ -51,23 +53,27 @@ steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - push
-      - --all-tags
-      - ${_IMAGE}
+      - ${_IMAGE}:$SHORT_SHA
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_IMAGE}:latest
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    entrypoint: bash
     args:
-      - -c
-      - |
-        gcloud run deploy ${_SERVICE} \
-          --image=${_IMAGE}:$SHORT_SHA \
-          --region=${_REGION} \
-          --platform=managed \
-          --allow-unauthenticated \
-          --set-env-vars="GOOGLE_CLIENT_ID=$$GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$$GOOGLE_CLIENT_SECRET"
-    secretEnv:
-      - GOOGLE_CLIENT_ID
-      - GOOGLE_CLIENT_SECRET
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --execution-environment=gen2
+      - --set-env-vars=NODE_ENV=production
+      - --update-secrets=GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,TOKEN_ENCRYPTION_KEY=TOKEN_ENCRYPTION_KEY:latest
+      - --quiet
 
 images:
   - ${_IMAGE}:$SHORT_SHA
