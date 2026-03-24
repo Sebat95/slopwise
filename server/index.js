@@ -107,8 +107,7 @@ function getCookie(req, name) {
     const key =
       separatorIndex >= 0 ? trimmed.slice(0, separatorIndex) : trimmed;
     if (key !== name) continue;
-    const value =
-      separatorIndex >= 0 ? trimmed.slice(separatorIndex + 1) : '';
+    const value = separatorIndex >= 0 ? trimmed.slice(separatorIndex + 1) : '';
     return decodeURIComponent(value);
   }
 
@@ -265,7 +264,10 @@ async function getOrCreateFirebaseUser(profile) {
       if (isFirebaseAuthCode(createError, 'auth/email-already-exists')) {
         userRecord = await adminAuth.getUserByEmail(profile.email);
       } else {
-        throw mapFirebaseAuthError(createError, 'Could not create your account.');
+        throw mapFirebaseAuthError(
+          createError,
+          'Could not create your account.'
+        );
       }
     }
   }
@@ -343,17 +345,23 @@ function decryptRefreshToken(data) {
 
 async function storeRefreshToken(uid, refreshToken) {
   googleAccessTokenCache.delete(uid);
-  await getFirestore().collection('user_tokens').doc(uid).set(
-    {
-      ...encryptRefreshToken(refreshToken),
-      refresh_token: FieldValue.delete()
-    },
-    { merge: true }
-  );
+  await getFirestore()
+    .collection('user_tokens')
+    .doc(uid)
+    .set(
+      {
+        ...encryptRefreshToken(refreshToken),
+        refresh_token: FieldValue.delete()
+      },
+      { merge: true }
+    );
 }
 
 async function getStoredRefreshToken(uid) {
-  const tokenDoc = await getFirestore().collection('user_tokens').doc(uid).get();
+  const tokenDoc = await getFirestore()
+    .collection('user_tokens')
+    .doc(uid)
+    .get();
   const data = tokenDoc.data();
   if (!tokenDoc.exists || !data) {
     throw new HttpError(
@@ -373,15 +381,18 @@ async function getStoredRefreshToken(uid) {
 }
 
 async function hasStoredRefreshToken(uid) {
-  const tokenDoc = await getFirestore().collection('user_tokens').doc(uid).get();
+  const tokenDoc = await getFirestore()
+    .collection('user_tokens')
+    .doc(uid)
+    .get();
   const data = tokenDoc.data();
   return Boolean(
     tokenDoc.exists &&
-      data &&
-      (typeof data.refresh_token === 'string' ||
-        (typeof data.refresh_token_ciphertext === 'string' &&
-          typeof data.refresh_token_iv === 'string' &&
-          typeof data.refresh_token_tag === 'string'))
+    data &&
+    (typeof data.refresh_token === 'string' ||
+      (typeof data.refresh_token_ciphertext === 'string' &&
+        typeof data.refresh_token_iv === 'string' &&
+        typeof data.refresh_token_tag === 'string'))
   );
 }
 
@@ -488,7 +499,11 @@ function parseIdToken(body) {
 function parseAuthorizationCode(body) {
   const code = body?.code;
   if (typeof code !== 'string' || !code.trim()) {
-    throw new HttpError(400, 'missing_code', 'Missing Google authorization code.');
+    throw new HttpError(
+      400,
+      'missing_code',
+      'Missing Google authorization code.'
+    );
   }
   return code.trim();
 }
@@ -503,7 +518,8 @@ function parseProxyRequest(body) {
   }
 
   const url = body.url;
-  const method = typeof body.method === 'string' ? body.method.toUpperCase() : 'GET';
+  const method =
+    typeof body.method === 'string' ? body.method.toUpperCase() : 'GET';
   const requestBody = body.body;
 
   if (typeof url !== 'string' || !url.trim()) {
@@ -758,7 +774,9 @@ app.post('/api/sessionLogout', async (req, res) => {
     const decodedSession = await maybeGetSession(req, res);
     if (decodedSession?.uid) {
       googleAccessTokenCache.delete(decodedSession.uid);
-      await getAuth().revokeRefreshTokens(decodedSession.uid).catch(() => {});
+      await getAuth()
+        .revokeRefreshTokens(decodedSession.uid)
+        .catch(() => {});
     }
     clearSessionCookie(res);
     res.status(204).end();
@@ -799,7 +817,8 @@ app.post('/api/googleProxy', googleProxyRateLimiter, async (req, res) => {
     res
       .status(upstreamResponse.status)
       .type(
-        upstreamResponse.headers.get('content-type') || 'application/json; charset=utf-8'
+        upstreamResponse.headers.get('content-type') ||
+          'application/json; charset=utf-8'
       )
       .send(responseText);
   } catch (error) {

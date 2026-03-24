@@ -1,9 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import {
-  inMemoryPersistence,
-  getAuth,
-  setPersistence
-} from 'firebase/auth';
+import { inMemoryPersistence, getAuth, setPersistence } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
