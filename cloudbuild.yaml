@@ -19,10 +19,6 @@ availableSecrets:
       env: VITE_FIREBASE_APP_ID
     - versionName: projects/468513744130/secrets/GOOGLE_CLIENT_ID/versions/latest
       env: GOOGLE_CLIENT_ID
-    - versionName: projects/468513744130/secrets/GOOGLE_CLIENT_SECRET/versions/latest
-      env: GOOGLE_CLIENT_SECRET
-    - versionName: projects/468513744130/secrets/TOKEN_ENCRYPTION_KEY/versions/latest
-      env: TOKEN_ENCRYPTION_KEY
 
 steps:
   - name: gcr.io/cloud-builders/docker
