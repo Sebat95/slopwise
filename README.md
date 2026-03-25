@@ -15,9 +15,9 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 >
 > After burning through some tokens, I had Claude 4.6 shortlist the three best versions, and I picked the one that felt right to iterate on.
 > From there, I stuck with Claude to refine the product and add features since it was the fastest way to ship.
-> I have since deployed it to Cloud Run (only opened to whitelisted emails, blame it on google strict CLIENT_ID policy) and ironed out a few minor bugs.
+> I have since deployed it to Cloud Run and I ironed out a few minor bugs.
 >
-> I am pretty proud of the result! It is now my daily driver for expense tracking, and I will be "vibing out" any new feature or fix as they come up.
+> I am pretty proud of the result! It is now my daily driver for expense tracking, and I will be "vibing out" any new features or fixes as they come up.
 >
 > Well, I leave you now to the rest of the generated README.md
 
