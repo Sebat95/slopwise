@@ -105,7 +105,7 @@ export default function SheetPickerPage() {
       const { members, expenses } = parseCompetitorCSV(text);
       if (members.length === 0) {
         setError(
-          'Could not parse CSV. Make sure it matches Competitor export format.'
+          'Could not parse CSV. Make sure it matches competitors export format.'
         );
         setImporting(false);
         return;
@@ -216,7 +216,7 @@ export default function SheetPickerPage() {
           Import from CSV
         </h1>
         <p className="text-text-secondary mb-6 text-sm">
-          Import a Competitor CSV export. The app will create a new spreadsheet
+          Import a competitors CSV export. The app will create a new spreadsheet
           with the imported data.
         </p>
 

@@ -30,7 +30,7 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 - **Spending Chart** — Interactive spending-over-time chart with per-member colored lines and a draggable date range brush
 - **Stats Page** — Date-range filtered totals, per-person breakdown, net balances, simplified debts
 - **Google Sheets Backend** — All data stored in your Google Sheets, accessible and editable directly
-- **CSV Interop** — Import CSV exports from Splitwise and export in the same format
+- **CSV Interop** — Import CSV exports from competitors and export in the same format
 - **PWA** — Installable on mobile and desktop with persistent sessions
 - **Sheet Picker** — Choose any spreadsheet from your Google Drive or create a new one
 - **Multiple Groups** — Each spreadsheet is a group; switch between them freely
@@ -52,44 +52,44 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 
 ```
 ┌──────────────────────────────────────────────────┐
-│               Cloud Run Container                 │
-│                                                   │
-│  ┌─────────────────────────────────────────────┐  │
-│  │  Express Server (server/index.js)           │  │
-│  │                                             │  │
-│  │  POST /api/exchangeCode                    │  │
-│  │    → Google auth code → access + refresh    │  │
-│  │    → Encrypt & store refresh in Firestore   │  │
-│  │    → Return Firebase custom token           │  │
-│  │                                             │  │
-│  │  POST /api/sessionLogin                    │  │
-│  │    → Firebase ID token → session cookie     │  │
-│  │                                             │  │
-│  │  GET  /api/session                         │  │
-│  │    → Verify session cookie → user info      │  │
-│  │                                             │  │
-│  │  POST /api/sessionLogout                   │  │
-│  │    → Clear session cookie                   │  │
-│  │                                             │  │
-│  │  POST /api/googleProxy                     │  │
-│  │    → Verify session → refresh access token  │  │
-│  │    → Proxy request to Google APIs           │  │
-│  │    → Allowlisted targets only               │  │
-│  │                                             │  │
-│  │  GET  /*  → Static frontend (SPA)           │  │
-│  └─────────────────────────────────────────────┘  │
-│                                                   │
-│  ┌─────────────────────────────────────────────┐  │
-│  │  Static Frontend (dist/)                    │  │
-│  │  React PWA                                  │  │
-│  └─────────────────────────────────────────────┘  │
+│               Cloud Run Container                │
+│                                                  │
+│  ┌─────────────────────────────────────────────┐ │
+│  │  Express Server (server/index.js)           │ │
+│  │                                             │ │
+│  │  POST /api/exchangeCode                     │ │
+│  │    → Google auth code → access + refresh    │ │
+│  │    → Encrypt & store refresh in Firestore   │ │
+│  │    → Return Firebase custom token           │ │
+│  │                                             │ │
+│  │  POST /api/sessionLogin                     │ │
+│  │    → Firebase ID token → session cookie     │ │
+│  │                                             │ │
+│  │  GET  /api/session                          │ │
+│  │    → Verify session cookie → user info      │ │
+│  │                                             │ │
+│  │  POST /api/sessionLogout                    │ │
+│  │    → Clear session cookie                   │ │
+│  │                                             │ │
+│  │  POST /api/googleProxy                      │ │
+│  │    → Verify session → refresh access token  │ │
+│  │    → Proxy request to Google APIs           │ │
+│  │    → Allowlisted targets only               │ │
+│  │                                             │ │
+│  │  GET  /*  → Static frontend (SPA)           │ │
+│  └─────────────────────────────────────────────┘ │
+│                                                  │
+│  ┌─────────────────────────────────────────────┐ │
+│  │  Static Frontend (dist/)                    │ │
+│  │  React PWA                                  │ │
+│  └─────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────┘
          │                        │
          ▼                        ▼
    ┌───────────┐          ┌──────────────┐
-   │ Firestore │          │ Google Sheets │
-   │ (encrypted│          │ (user data)   │
-   │  tokens)  │          │               │
+   │ Firestore │          │ Google Sheets│
+   │ (encrypted│          │ (user data)  │
+   │  tokens)  │          │              │
    └───────────┘          └──────────────┘
 ```
 
@@ -192,7 +192,7 @@ The `cloudbuild.yaml` handles passing build args and mounting runtime secrets on
 
 ## Google Sheets Data Format
 
-The app stores data in Splitwise-compatible CSV format:
+The app stores data in competitors-compatible CSV format:
 
 | Date       | Description | Category   | Cost  | Currency | Alice  | Bob    | Charlie |
 | ---------- | ----------- | ---------- | ----- | -------- | ------ | ------ | ------- |
@@ -212,6 +212,6 @@ Additional sheet tabs:
 
 ## Categories
 
-20 simplified categories that map from all Splitwise subcategories:
+20 simplified categories that map from all competitors subcategories:
 
 General, Groceries, Dining out, Drinks, Rent, Utilities, Household, Transport, Travel, Entertainment, Shopping, Healthcare, Education, Gifts, Insurance, Taxes, Sports, Pets, Services, Payment
