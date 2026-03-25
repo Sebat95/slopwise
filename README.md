@@ -1,6 +1,6 @@
 # Slopwise — Expense tracking Clone Powered by Google Sheets
 
-A fully functional, mobile-first PWA for splitting expenses with friends. All data is stored in your own Google Sheets. Authentication via Firebase + server-side token refresh for seamless mobile experience.
+A fully functional, mobile-first PWA for splitting expenses with friends. All data is stored in your own Google Sheets. Server-side session management with encrypted cookies and a Google API proxy for seamless, persistent authentication.
 
 > [!IMPORTANT]
 > I have always wanted to try "vibecoding" an app from scratch, so here I am! I used Cursor to test several competing models:
@@ -25,60 +25,83 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 
 - **Expense Tracking** — Add, edit, and delete expenses with descriptions, categories, amounts, and dates
 - **Flexible Splitting** — Split equally, by exact amounts, by percentage, or by shares; last split type and payer remembered
-- **Balance Calculation** — Real-time net balances for each member with simplified debt optimization
+- **Balance Calculation** — Real-time net balances for each member with simplified debt optimization and zero-sum rounding correction
 - **Settle Up** — Record payments between members with smart prefill and swap
-- **Spending Chart** — Interactive spending-over-time chart with per-member lines and a draggable date range brush
+- **Spending Chart** — Interactive spending-over-time chart with per-member colored lines and a draggable date range brush
+- **Stats Page** — Date-range filtered totals, per-person breakdown, net balances, simplified debts
 - **Google Sheets Backend** — All data stored in your Google Sheets, accessible and editable directly
-- **CSV Interop** — Import CSV exports from major competitor and export in the same format
-- **PWA** — Installable on mobile and desktop with persistent login
+- **CSV Interop** — Import CSV exports from Splitwise and export in the same format
+- **PWA** — Installable on mobile and desktop with persistent sessions
 - **Sheet Picker** — Choose any spreadsheet from your Google Drive or create a new one
 - **Multiple Groups** — Each spreadsheet is a group; switch between them freely
 - **Member Profiles** — Link Google accounts to members for profile pictures; stored in a `_members` sheet tab
-- **Persistent Auth** — Firebase session + server-side Google token refresh; sign in once, stay logged in forever
+- **Persistent Auth** — Server-side session cookies + encrypted refresh tokens in Firestore; sign in once, stay logged in across app restarts
 
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4
-- **Auth**: Firebase Authentication (Google OAuth 2.0)
-- **APIs**: Google Sheets API v4, Google Drive API v3
-- **Server**: Express (Node.js) — serves frontend + token refresh API
-- **Token Storage**: Firestore (stores Google refresh tokens for silent renewal)
+- **Auth**: Firebase Authentication (custom tokens) + Google Identity Services (auth code flow)
+- **Server**: Express 5 (Node.js) — serves frontend, manages sessions, proxies Google APIs
+- **Session Management**: HTTP-only encrypted session cookies, Firebase Admin SDK for token verification
+- **Token Storage**: Firestore with AES-256-GCM encrypted Google refresh tokens
+- **APIs**: Google Sheets API v4, Google Drive API v3 (proxied through server)
 - **PWA**: vite-plugin-pwa (Workbox)
-- **Deployment**: Docker, Cloud Run (single container serves everything)
+- **Deployment**: Docker (multi-stage), Cloud Run (single container), Cloud Build
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│              Cloud Run Container             │
-│                                              │
-│  ┌────────────────────────────────────────┐  │
-│  │  Express Server (server/index.js)      │  │
-│  │                                        │  │
-│  │  GET /*       → Static frontend (SPA)  │  │
-│  │  POST /api/exchangeCode               │  │
-│  │    → Google auth code → tokens         │  │
-│  │    → Store refresh token in Firestore  │  │
-│  │    → Return access token + Firebase    │  │
-│  │      custom token                      │  │
-│  │  POST /api/refreshGoogleToken         │  │
-│  │    → Firebase ID token → verify        │  │
-│  │    → Get refresh token from Firestore  │  │
-│  │    → Mint fresh Google access token    │  │
-│  └────────────────────────────────────────┘  │
-│                                              │
-│  ┌────────────────────────────────────────┐  │
-│  │  Static Frontend (dist/)               │  │
-│  │  React PWA                             │  │
-│  └────────────────────────────────────────┘  │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│               Cloud Run Container                 │
+│                                                   │
+│  ┌─────────────────────────────────────────────┐  │
+│  │  Express Server (server/index.js)           │  │
+│  │                                             │  │
+│  │  POST /api/exchangeCode                    │  │
+│  │    → Google auth code → access + refresh    │  │
+│  │    → Encrypt & store refresh in Firestore   │  │
+│  │    → Return Firebase custom token           │  │
+│  │                                             │  │
+│  │  POST /api/sessionLogin                    │  │
+│  │    → Firebase ID token → session cookie     │  │
+│  │                                             │  │
+│  │  GET  /api/session                         │  │
+│  │    → Verify session cookie → user info      │  │
+│  │                                             │  │
+│  │  POST /api/sessionLogout                   │  │
+│  │    → Clear session cookie                   │  │
+│  │                                             │  │
+│  │  POST /api/googleProxy                     │  │
+│  │    → Verify session → refresh access token  │  │
+│  │    → Proxy request to Google APIs           │  │
+│  │    → Allowlisted targets only               │  │
+│  │                                             │  │
+│  │  GET  /*  → Static frontend (SPA)           │  │
+│  └─────────────────────────────────────────────┘  │
+│                                                   │
+│  ┌─────────────────────────────────────────────┐  │
+│  │  Static Frontend (dist/)                    │  │
+│  │  React PWA                                  │  │
+│  └─────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────┘
          │                        │
          ▼                        ▼
    ┌───────────┐          ┌──────────────┐
-   │ Firestore │          │ Google Sheets│
-   │ (tokens)  │          │ (user data)  │
+   │ Firestore │          │ Google Sheets │
+   │ (encrypted│          │ (user data)   │
+   │  tokens)  │          │               │
    └───────────┘          └──────────────┘
 ```
+
+## Security
+
+- Google refresh tokens are encrypted with AES-256-GCM before storage in Firestore
+- Session cookies are HTTP-only, Secure, SameSite=Lax (or `__Host-` prefixed in production)
+- Google API requests are proxied server-side through an allowlisted target list (only Sheets and Drive endpoints)
+- Rate limiting on auth and proxy endpoints
+- Non-root container user in production Docker image
+- HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy headers
+- CSP configured for Google OAuth, Sheets API, and Firebase domains
 
 ## Getting Started
 
@@ -100,7 +123,9 @@ yarn install
 5. Go to [Google Cloud Console](https://console.cloud.google.com/) for the same project
 6. Enable the **Google Sheets API** and **Google Drive API**
 7. Go to **APIs & Services → Credentials** and note the **OAuth Client ID** and **Client Secret**
-8. Go to **OAuth consent screen**, configure it, and add test users if in testing mode
+8. Under **Authorized JavaScript origins**, add your app URL and `http://localhost:5173`
+9. Under **Authorized redirect URIs**, add your app URL
+10. Go to **OAuth consent screen**, configure it, and add test users if in testing mode
 
 ### 3. Configure Environment Variables
 
@@ -111,7 +136,7 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-# Build-time (baked into frontend)
+# Build-time (baked into frontend by Vite)
 VITE_FIREBASE_API_KEY=your_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
 VITE_FIREBASE_PROJECT_ID=your_project_id
@@ -119,42 +144,55 @@ VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 
-# Build-time + runtime
+# Build-time + runtime (Dockerfile aliases to VITE_GOOGLE_CLIENT_ID for Vite)
 GOOGLE_CLIENT_ID=your_oauth_client_id
 
 # Runtime only (server)
 GOOGLE_CLIENT_SECRET=your_oauth_client_secret
+
+# Base64-encoded 32-byte key for encrypting refresh tokens
+# Generate with: openssl rand -base64 32
+TOKEN_ENCRYPTION_KEY=your_base64_key
 ```
 
 ### 4. Run locally
+
+Frontend:
 
 ```bash
 yarn dev
 ```
 
-Open http://localhost:5173
-
-For the token refresh API to work locally, you also need to run the server:
+Server (in a separate terminal):
 
 ```bash
-cd server && npm install && GOOGLE_CLIENT_ID=xxx GOOGLE_CLIENT_SECRET=xxx node index.js
+cd server && npm install
+GOOGLE_CLIENT_ID=xxx GOOGLE_CLIENT_SECRET=xxx TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32) node index.js
 ```
 
 ### 5. Deploy to Cloud Run
 
-The project includes a `Dockerfile` and `cloudbuild.yaml` for automated deployment.
+The project includes a `Dockerfile` and `cloudbuild.yaml` for automated deployment via Cloud Build.
 
 **Secrets needed in GCP Secret Manager:**
 
-- All `VITE_FIREBASE_*` secrets (build-time)
-- `GOOGLE_CLIENT_ID` (build-time + runtime)
-- `GOOGLE_CLIENT_SECRET` (runtime only)
+| Secret | Used at | Description |
+|--------|---------|-------------|
+| `VITE_FIREBASE_API_KEY` | Build | Firebase config |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Build | Firebase config |
+| `VITE_FIREBASE_PROJECT_ID` | Build | Firebase config |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Build | Firebase config |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Build | Firebase config |
+| `VITE_FIREBASE_APP_ID` | Build | Firebase config |
+| `GOOGLE_CLIENT_ID` | Build + Runtime | OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Runtime | OAuth Client Secret |
+| `TOKEN_ENCRYPTION_KEY` | Runtime | AES-256 key for token encryption |
 
-The `cloudbuild.yaml` handles passing build args and setting Cloud Run env vars automatically.
+The `cloudbuild.yaml` handles passing build args and mounting runtime secrets on Cloud Run automatically.
 
 ## Google Sheets Data Format
 
-The app stores data in competitor-compatible CSV format:
+The app stores data in Splitwise-compatible CSV format:
 
 | Date       | Description | Category   | Cost  | Currency | Alice  | Bob    | Charlie |
 | ---------- | ----------- | ---------- | ----- | -------- | ------ | ------ | ------- |
