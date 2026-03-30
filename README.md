@@ -176,17 +176,17 @@ The project includes a `Dockerfile` and `cloudbuild.yaml` for automated deployme
 
 **Secrets needed in GCP Secret Manager:**
 
-| Secret | Used at | Description |
-|--------|---------|-------------|
-| `VITE_FIREBASE_API_KEY` | Build | Firebase config |
-| `VITE_FIREBASE_AUTH_DOMAIN` | Build | Firebase config |
-| `VITE_FIREBASE_PROJECT_ID` | Build | Firebase config |
-| `VITE_FIREBASE_STORAGE_BUCKET` | Build | Firebase config |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Build | Firebase config |
-| `VITE_FIREBASE_APP_ID` | Build | Firebase config |
-| `GOOGLE_CLIENT_ID` | Build + Runtime | OAuth Client ID |
-| `GOOGLE_CLIENT_SECRET` | Runtime | OAuth Client Secret |
-| `TOKEN_ENCRYPTION_KEY` | Runtime | AES-256 key for token encryption |
+| Secret                              | Used at         | Description                      |
+| ----------------------------------- | --------------- | -------------------------------- |
+| `VITE_FIREBASE_API_KEY`             | Build           | Firebase config                  |
+| `VITE_FIREBASE_AUTH_DOMAIN`         | Build           | Firebase config                  |
+| `VITE_FIREBASE_PROJECT_ID`          | Build           | Firebase config                  |
+| `VITE_FIREBASE_STORAGE_BUCKET`      | Build           | Firebase config                  |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Build           | Firebase config                  |
+| `VITE_FIREBASE_APP_ID`              | Build           | Firebase config                  |
+| `GOOGLE_CLIENT_ID`                  | Build + Runtime | OAuth Client ID                  |
+| `GOOGLE_CLIENT_SECRET`              | Runtime         | OAuth Client Secret              |
+| `TOKEN_ENCRYPTION_KEY`              | Runtime         | AES-256 key for token encryption |
 
 The `cloudbuild.yaml` handles passing build args and mounting runtime secrets on Cloud Run automatically.
 

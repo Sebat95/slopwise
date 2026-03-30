@@ -10,3 +10,6 @@ Dockerfile
 .git
 .gitignore
 .env
+playwright-report/
+test-results/
+blob-report/
