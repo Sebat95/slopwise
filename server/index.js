@@ -15,7 +15,7 @@ const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === 'production'
     ? '__Host-slopwise_session'
     : 'slopwise_session';
-const GOOGLE_PROXY_TIMEOUT_MS = 15000;
+const GOOGLE_PROXY_TIMEOUT_MS = 30000;
 const GOOGLE_ACCESS_TOKEN_TTL_FALLBACK_MS = 1000 * 60 * 55;
 const GOOGLE_ALLOWED_TARGETS = new Map([
   ['sheets.googleapis.com', ['/v4/spreadsheets']],
@@ -576,6 +576,13 @@ function parseProxyRequest(body) {
   };
 }
 
+function isAbortOrTimeoutError(error) {
+  if (!error || typeof error !== 'object') return false;
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') return true;
+  if (error.code === 'ABORT_ERR') return true;
+  return false;
+}
+
 async function mapGoogleApiError(response) {
   let responseBody = null;
   try {
@@ -794,15 +801,28 @@ app.post('/api/googleProxy', googleProxyRateLimiter, async (req, res) => {
     const proxyRequest = parseProxyRequest(req.body);
     const accessToken = await getGoogleAccessTokenForUser(session.uid);
 
-    const upstreamResponse = await fetch(proxyRequest.url, {
-      method: proxyRequest.method,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: proxyRequest.body,
-      signal: AbortSignal.timeout(GOOGLE_PROXY_TIMEOUT_MS)
-    });
+    let upstreamResponse;
+    try {
+      upstreamResponse = await fetch(proxyRequest.url, {
+        method: proxyRequest.method,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: proxyRequest.body,
+        signal: AbortSignal.timeout(GOOGLE_PROXY_TIMEOUT_MS)
+      });
+    } catch (error) {
+      if (isAbortOrTimeoutError(error)) {
+        throw new HttpError(
+          504,
+          'google_proxy_timeout',
+          'Google took too long to respond. Try again.',
+          error
+        );
+      }
+      throw error;
+    }
 
     if (!upstreamResponse.ok) {
       throw await mapGoogleApiError(upstreamResponse);
