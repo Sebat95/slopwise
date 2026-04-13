@@ -220,36 +220,30 @@ export default function DashboardPage() {
         {members.length > 0 && (debts.length > 0 || expenses.length > 0) && (
           <div className="mb-6">
             {debts.length > 0 ? (
-              <>
-                <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
-                  Simplified Debts ({debts.length} payment
-                  {debts.length !== 1 ? 's' : ''})
-                </h2>
-                <div className="space-y-2">
-                  {debts.map((d, i) => (
-                    <div
-                      key={i}
-                      className="bg-bg-card border-border/50 flex items-center gap-3 rounded-xl border p-3.5"
-                    >
-                      <Avatar name={d.from} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-text-primary text-sm font-medium">
-                            {d.from}
-                          </span>
-                          <ArrowRight size={14} className="text-text-muted" />
-                          <span className="text-text-primary text-sm font-medium">
-                            {d.to}
-                          </span>
-                        </div>
+              <div className="space-y-2">
+                {debts.map((d, i) => (
+                  <div
+                    key={i}
+                    className="bg-bg-card border-border/50 flex items-center gap-3 rounded-xl border p-3.5"
+                  >
+                    <Avatar name={d.from} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-text-primary text-sm font-medium">
+                          {d.from}
+                        </span>
+                        <ArrowRight size={14} className="text-text-muted" />
+                        <span className="text-text-primary text-sm font-medium">
+                          {d.to}
+                        </span>
                       </div>
-                      <span className="text-negative text-sm font-bold">
-                        {formatCurrency(d.amount, currency)}
-                      </span>
                     </div>
-                  ))}
-                </div>
-              </>
+                    <span className="text-negative text-sm font-bold">
+                      {formatCurrency(d.amount, currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <EmptyState
                 icon={<Handshake size={40} />}
