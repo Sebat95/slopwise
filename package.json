@@ -1,7 +1,7 @@
 {
   "name": "slopwise",
   "private": true,
-  "version": "1.6.3",
+  "version": "1.6.4",
   "packageManager": "yarn@4.12.0",
   "type": "module",
   "scripts": {
@@ -45,7 +45,7 @@
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.48.0",
-    "vite": "7.3.1",
+    "vite": "8.0.8",
     "vite-plugin-pwa": "1.2.0",
     "vitest": "4.1.1",
     "workbox-window": "7.4.0"

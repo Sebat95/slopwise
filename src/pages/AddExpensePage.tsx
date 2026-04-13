@@ -7,6 +7,11 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { CATEGORIES, CURRENCIES, type Expense, type SplitType } from '../types';
 import { calculateSplits } from '../utils/balance';
 import {
+  equalSplitRememberPreset,
+  getPresetInvolvedMembers,
+  getPresetValuesFromStorage
+} from '../utils/split-presets';
+import {
   todayStr,
   formatCurrency,
   getCategoryEmoji,
@@ -47,25 +52,18 @@ export default function AddExpensePage() {
 
   const getPresetValues = useCallback(
     (type: SplitType): Record<string, number> => {
-      const preset = lastSplitValuePresets[type] || {};
-      return members.reduce<Record<string, number>>((acc, member) => {
-        const value = preset[member];
-        if (Number.isFinite(value)) acc[member] = value;
-        return acc;
-      }, {});
+      return getPresetValuesFromStorage(lastSplitValuePresets[type], members);
     },
     [lastSplitValuePresets, members]
   );
 
   const getPresetInvolved = useCallback(
     (type: SplitType): Set<string> => {
-      const presetValues = getPresetValues(type);
-      const presetMembers = members.filter(
-        (member) => (presetValues[member] ?? 0) > 0
+      return new Set(
+        getPresetInvolvedMembers(lastSplitValuePresets[type], members)
       );
-      return new Set(presetMembers.length > 0 ? presetMembers : members);
     },
-    [getPresetValues, members]
+    [lastSplitValuePresets, members]
   );
 
   const buildSplitValues = useCallback(
@@ -285,13 +283,13 @@ export default function AddExpensePage() {
 
     try {
       if (!isEdit) {
-        const rememberedValues = [...involved].reduce<Record<string, number>>(
-          (acc, member) => {
-            acc[member] = splitValues[member] ?? 0;
-            return acc;
-          },
-          {}
-        );
+        const rememberedValues =
+          splitType === 'equal'
+            ? equalSplitRememberPreset(involved)
+            : [...involved].reduce<Record<string, number>>((acc, member) => {
+                acc[member] = splitValues[member] ?? 0;
+                return acc;
+              }, {});
         setLastSplitValuesForType(splitType, rememberedValues);
       }
       const splits = calculateSplits(

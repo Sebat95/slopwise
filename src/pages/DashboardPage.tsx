@@ -73,6 +73,13 @@ export default function DashboardPage() {
     () => calculateNetBalances(expenses, members),
     [expenses, members]
   );
+  const membersInDebt = useMemo(
+    () =>
+      [...members]
+        .filter((m) => (netBalances[m] || 0) < -0.01)
+        .sort((a, b) => (netBalances[a] || 0) - (netBalances[b] || 0)),
+    [members, netBalances]
+  );
   const debts = useMemo(
     () => simplifyDebts(expenses, members),
     [expenses, members]
@@ -212,37 +219,34 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Member Balances */}
+        {/* Who owes (net debtors only) */}
         {members.length > 0 && (
           <div className="bg-bg-card border-border/50 mb-6 rounded-2xl border p-4">
-            <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {members.map((m) => {
-                const bal = netBalances[m] || 0;
-                return (
-                  <div
-                    key={m}
-                    className="flex min-w-[64px] shrink-0 flex-col items-center"
-                  >
-                    <Avatar name={m} size="sm" />
-                    <span className="text-text-secondary mt-1 max-w-[64px] truncate text-[11px]">
-                      {m}
-                    </span>
-                    <span
-                      className={`text-[11px] font-semibold ${
-                        bal > 0.01
-                          ? 'text-positive'
-                          : bal < -0.01
-                            ? 'text-negative'
-                            : 'text-text-muted'
-                      }`}
+            {membersInDebt.length === 0 ? (
+              <p className="text-text-muted text-center text-sm">
+                No one owes money right now
+              </p>
+            ) : (
+              <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                {membersInDebt.map((m) => {
+                  const bal = netBalances[m] || 0;
+                  return (
+                    <div
+                      key={m}
+                      className="flex min-w-[64px] shrink-0 flex-col items-center"
                     >
-                      {bal > 0.01 ? '+' : ''}
-                      {formatCurrency(bal, currency)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                      <Avatar name={m} size="sm" />
+                      <span className="text-text-secondary mt-1 max-w-[64px] truncate text-[11px]">
+                        {m}
+                      </span>
+                      <span className="text-negative text-[11px] font-semibold">
+                        {formatCurrency(bal, currency)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
