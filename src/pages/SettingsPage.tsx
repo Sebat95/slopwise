@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
@@ -23,6 +24,7 @@ import {
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { logout } = useAuth();
   const {
     spreadsheetId,
@@ -119,22 +121,28 @@ export default function SettingsPage() {
   };
 
   const handleLogout = async () => {
-    if (
-      window.confirm(
-        'Sign out? You will need to sign in again to access your sheets.'
-      )
-    ) {
+    const ok = await confirm({
+      title: 'Sign out?',
+      message: 'You will need to sign in again to access your spreadsheets.',
+      confirmLabel: 'Sign out',
+      cancelLabel: 'Cancel',
+      variant: 'danger'
+    });
+    if (ok) {
       await logout();
       navigate('/');
     }
   };
 
-  const handleDisconnect = () => {
-    if (
-      window.confirm(
-        'Disconnect from this spreadsheet? You can reconnect later.'
-      )
-    ) {
+  const handleDisconnect = async () => {
+    const ok = await confirm({
+      title: 'Disconnect spreadsheet?',
+      message: 'You can pick this sheet again from your list later.',
+      confirmLabel: 'Disconnect',
+      cancelLabel: 'Cancel',
+      variant: 'default'
+    });
+    if (ok) {
       disconnect();
       navigate('/sheets');
     }

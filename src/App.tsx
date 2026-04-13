@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AppProvider, useApp } from './contexts/AppContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import LoginPage from './pages/LoginPage';
 import SheetPickerPage from './pages/SheetPickerPage';
 import DashboardPage from './pages/DashboardPage';
@@ -123,7 +124,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppProvider>
-          <AppRoutes />
+          <ConfirmProvider>
+            <AppRoutes />
+          </ConfirmProvider>
         </AppProvider>
       </AuthProvider>
     </BrowserRouter>

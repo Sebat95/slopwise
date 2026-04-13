@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import Layout from '../components/Layout';
 import ExpenseCard from '../components/ExpenseCard';
 import EmptyState from '../components/EmptyState';
@@ -12,6 +13,7 @@ import { getCategoryEmoji, formatCurrency } from '../utils/format';
 export default function ExpensesPage() {
   const navigate = useNavigate();
   const { expenses, currency, isLoading, deleteExpense } = useApp();
+  const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -53,10 +55,16 @@ export default function ExpensesPage() {
   );
 
   const handleEdit = (id: string) => navigate(`/edit/${id}`);
-  const handleDelete = (id: string) => {
-    if (window.confirm('Delete this expense?')) {
-      void deleteExpense(id).catch(() => {});
-    }
+  const handleDelete = async (id: string) => {
+    const ok = await confirm({
+      title: 'Delete expense?',
+      message:
+        'This will remove the expense from the sheet. You cannot undo this.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger'
+    });
+    if (ok) void deleteExpense(id).catch(() => {});
   };
 
   if (isLoading && expenses.length === 0) {

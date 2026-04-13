@@ -5,16 +5,9 @@ import Avatar from '../components/Avatar';
 import EmptyState from '../components/EmptyState';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SpendingChart from '../components/SpendingChart';
-import { calculateNetBalances, simplifyDebts } from '../utils/balance';
+import { calculateNetBalances } from '../utils/balance';
 import { formatCurrency } from '../utils/format';
-import {
-  Scale,
-  ArrowRight,
-  Handshake,
-  TrendingUp,
-  TrendingDown,
-  CalendarRange
-} from 'lucide-react';
+import { Scale, TrendingUp, TrendingDown, CalendarRange } from 'lucide-react';
 
 export default function BalancesPage() {
   const { members, expenses, currency, isLoading } = useApp();
@@ -76,11 +69,6 @@ export default function BalancesPage() {
     () => calculateNetBalances(filteredExpenses, members),
     [filteredExpenses, members]
   );
-  const debts = useMemo(
-    () => simplifyDebts(filteredExpenses, members),
-    [filteredExpenses, members]
-  );
-
   const sorted = useMemo(
     () =>
       [...members].sort(
@@ -228,48 +216,6 @@ export default function BalancesPage() {
                 })}
               </div>
             </div>
-
-            {/* Simplified Debts */}
-            {debts.length > 0 && (
-              <div>
-                <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
-                  Simplified Debts ({debts.length} payment
-                  {debts.length !== 1 ? 's' : ''})
-                </h2>
-                <div className="space-y-2">
-                  {debts.map((d, i) => (
-                    <div
-                      key={i}
-                      className="bg-bg-card border-border/50 flex items-center gap-3 rounded-xl border p-3.5"
-                    >
-                      <Avatar name={d.from} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-text-primary text-sm font-medium">
-                            {d.from}
-                          </span>
-                          <ArrowRight size={14} className="text-text-muted" />
-                          <span className="text-text-primary text-sm font-medium">
-                            {d.to}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-negative text-sm font-bold">
-                        {formatCurrency(d.amount, currency)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {debts.length === 0 && expenses.length > 0 && (
-              <EmptyState
-                icon={<Handshake size={40} />}
-                title="All settled up!"
-                description="No outstanding debts between members"
-              />
-            )}
           </>
         )}
       </div>

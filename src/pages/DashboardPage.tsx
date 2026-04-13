@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import Layout from '../components/Layout';
 import ExpenseCard from '../components/ExpenseCard';
 import Avatar from '../components/Avatar';
@@ -8,7 +9,7 @@ import SyncIndicator from '../components/SyncIndicator';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
-import { calculateNetBalances, simplifyDebts } from '../utils/balance';
+import { simplifyDebts } from '../utils/balance';
 import { formatCurrency, parseAmount } from '../utils/format';
 import {
   PlusCircle,
@@ -18,7 +19,8 @@ import {
   Check,
   X,
   Handshake,
-  ArrowLeftRight
+  ArrowLeftRight,
+  ArrowRight
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -34,6 +36,7 @@ export default function DashboardPage() {
     renameSheet,
     settleUp
   } = useApp();
+  const confirm = useConfirm();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -69,17 +72,6 @@ export default function DashboardPage() {
 
   const [visibleCount, setVisibleCount] = useState(10);
 
-  const netBalances = useMemo(
-    () => calculateNetBalances(expenses, members),
-    [expenses, members]
-  );
-  const membersInDebt = useMemo(
-    () =>
-      [...members]
-        .filter((m) => (netBalances[m] || 0) < -0.01)
-        .sort((a, b) => (netBalances[a] || 0) - (netBalances[b] || 0)),
-    [members, netBalances]
-  );
   const debts = useMemo(
     () => simplifyDebts(expenses, members),
     [expenses, members]
@@ -143,10 +135,16 @@ export default function DashboardPage() {
   };
 
   const handleEdit = (id: string) => navigate(`/edit/${id}`);
-  const handleDelete = (id: string) => {
-    if (window.confirm('Delete this expense?')) {
-      void deleteExpense(id).catch(() => {});
-    }
+  const handleDelete = async (id: string) => {
+    const ok = await confirm({
+      title: 'Delete expense?',
+      message:
+        'This will remove the expense from the sheet. You cannot undo this.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger'
+    });
+    if (ok) void deleteExpense(id).catch(() => {});
   };
 
   if (isLoading && expenses.length === 0) {
@@ -219,33 +217,45 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Who owes (net debtors only) */}
-        {members.length > 0 && (
-          <div className="bg-bg-card border-border/50 mb-6 rounded-2xl border p-4">
-            {membersInDebt.length === 0 ? (
-              <p className="text-text-muted text-center text-sm">
-                No one owes money right now
-              </p>
-            ) : (
-              <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                {membersInDebt.map((m) => {
-                  const bal = netBalances[m] || 0;
-                  return (
+        {members.length > 0 && (debts.length > 0 || expenses.length > 0) && (
+          <div className="mb-6">
+            {debts.length > 0 ? (
+              <>
+                <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
+                  Simplified Debts ({debts.length} payment
+                  {debts.length !== 1 ? 's' : ''})
+                </h2>
+                <div className="space-y-2">
+                  {debts.map((d, i) => (
                     <div
-                      key={m}
-                      className="flex min-w-[64px] shrink-0 flex-col items-center"
+                      key={i}
+                      className="bg-bg-card border-border/50 flex items-center gap-3 rounded-xl border p-3.5"
                     >
-                      <Avatar name={m} size="sm" />
-                      <span className="text-text-secondary mt-1 max-w-[64px] truncate text-[11px]">
-                        {m}
-                      </span>
-                      <span className="text-negative text-[11px] font-semibold">
-                        {formatCurrency(bal, currency)}
+                      <Avatar name={d.from} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-primary text-sm font-medium">
+                            {d.from}
+                          </span>
+                          <ArrowRight size={14} className="text-text-muted" />
+                          <span className="text-text-primary text-sm font-medium">
+                            {d.to}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-negative text-sm font-bold">
+                        {formatCurrency(d.amount, currency)}
                       </span>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <EmptyState
+                icon={<Handshake size={40} />}
+                title="All settled up!"
+                description="No outstanding debts between members"
+              />
             )}
           </div>
         )}
