@@ -34,6 +34,7 @@ Single-container app on Cloud Run: Express serves the React SPA and proxies all 
 ```
 Cloud Run (port 8080)
 ├── Express (server/index.js)
+│   ├── POST /api/oauthPrepare     — mint OAuth state (cookie + body)
 │   ├── POST /api/exchangeCode     — auth code → access/refresh tokens
 │   ├── POST /api/sessionLogin     — Firebase ID token → session cookie
 │   ├── GET  /api/session          — verify session

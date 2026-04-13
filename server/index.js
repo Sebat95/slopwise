@@ -6,6 +6,11 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { OAuth2Client } from 'google-auth-library';
+import {
+  constantTimeStateMatch,
+  isValidPopupCsrfRequest,
+  parseAuthorizationExchange
+} from './oauth-csrf.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = path.join(__dirname, 'public');
@@ -15,6 +20,8 @@ const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === 'production'
     ? '__Host-slopwise_session'
     : 'slopwise_session';
+const OAUTH_STATE_COOKIE_NAME = 'slopwise_oauth_state';
+const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 const GOOGLE_PROXY_TIMEOUT_MS = 30000;
 const GOOGLE_ACCESS_TOKEN_TTL_FALLBACK_MS = 1000 * 60 * 55;
 const GOOGLE_ALLOWED_TARGETS = new Map([
@@ -94,6 +101,25 @@ function clearSessionCookie(res) {
     secure: process.env.NODE_ENV === 'production',
     path: '/'
   });
+}
+
+function clearOAuthStateCookie(res) {
+  res.clearCookie(OAUTH_STATE_COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/'
+  });
+}
+
+function oauthStateCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: OAUTH_STATE_MAX_AGE_MS
+  };
 }
 
 function getCookie(req, name) {
@@ -496,18 +522,6 @@ function parseIdToken(body) {
   return idToken.trim();
 }
 
-function parseAuthorizationCode(body) {
-  const code = body?.code;
-  if (typeof code !== 'string' || !code.trim()) {
-    throw new HttpError(
-      400,
-      'missing_code',
-      'Missing Google authorization code.'
-    );
-  }
-  return code.trim();
-}
-
 function parseProxyRequest(body) {
   if (!body || typeof body !== 'object') {
     throw new HttpError(
@@ -670,11 +684,54 @@ function sendErrorResponse(error, req, res) {
   });
 }
 
+app.post('/api/oauthPrepare', authRateLimiter, (req, res) => {
+  sendNoStore(res);
+
+  try {
+    const state = crypto.randomBytes(32).toString('base64url');
+    res.cookie(OAUTH_STATE_COOKIE_NAME, state, oauthStateCookieOptions());
+    res.json({ state });
+  } catch (error) {
+    sendErrorResponse(error, req, res);
+  }
+});
+
 app.post('/api/exchangeCode', authRateLimiter, async (req, res) => {
   sendNoStore(res);
 
   try {
-    const code = parseAuthorizationCode(req.body);
+    if (!isValidPopupCsrfRequest(req)) {
+      clearOAuthStateCookie(res);
+      throw new HttpError(
+        403,
+        'csrf_validation_failed',
+        'Sign-in request was rejected for security reasons.'
+      );
+    }
+
+    const parsed = parseAuthorizationExchange(req.body);
+    if ('error' in parsed) {
+      clearOAuthStateCookie(res);
+      throw new HttpError(
+        parsed.error.status,
+        parsed.error.code,
+        parsed.error.message
+      );
+    }
+
+    const cookieState = getCookie(req, OAUTH_STATE_COOKIE_NAME);
+    if (!constantTimeStateMatch(cookieState, parsed.state)) {
+      clearOAuthStateCookie(res);
+      throw new HttpError(
+        403,
+        'oauth_state_mismatch',
+        'Sign-in session expired or was invalidated. Please try again.'
+      );
+    }
+
+    clearOAuthStateCookie(res);
+
+    const { code } = parsed;
     const client = getOAuth2Client();
 
     let tokens;

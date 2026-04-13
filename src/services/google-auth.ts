@@ -28,9 +28,14 @@ declare global {
             client_id: string;
             scope: string;
             ux_mode: string;
+            state?: string;
             access_type?: string;
             prompt?: string;
-            callback: (response: { code?: string; error?: string }) => void;
+            callback: (response: {
+              code?: string;
+              state?: string;
+              error?: string;
+            }) => void;
           }) => { requestCode: () => void };
         };
       };
@@ -57,7 +62,10 @@ function waitForGsi(): Promise<void> {
   });
 }
 
-function requestAuthCode(clientId: string): Promise<string> {
+function requestAuthCode(
+  clientId: string,
+  oauthState: string
+): Promise<{ code: string }> {
   return new Promise((resolve, reject) => {
     const codeClient = window.google!.accounts.oauth2.initCodeClient({
       client_id: clientId,
@@ -68,6 +76,7 @@ function requestAuthCode(clientId: string): Promise<string> {
         'https://www.googleapis.com/auth/userinfo.email'
       ].join(' '),
       ux_mode: 'popup',
+      state: oauthState,
       access_type: 'offline',
       prompt: 'consent',
       callback: (response) => {
@@ -79,7 +88,11 @@ function requestAuthCode(clientId: string): Promise<string> {
           reject(new Error('No auth code returned'));
           return;
         }
-        resolve(response.code);
+        if (response.state !== oauthState) {
+          reject(new Error('OAuth state mismatch'));
+          return;
+        }
+        resolve({ code: response.code });
       }
     });
     codeClient.requestCode();
@@ -120,14 +133,31 @@ export async function signIn(): Promise<void> {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) throw new Error('Missing VITE_GOOGLE_CLIENT_ID');
 
+  const prepareRes = await fetch(`${API_BASE}/oauthPrepare`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!prepareRes.ok) {
+    throw new Error(await readApiError(prepareRes, 'Could not start sign-in'));
+  }
+  const prepareData = (await prepareRes.json()) as { state?: string };
+  const oauthState = prepareData.state;
+  if (typeof oauthState !== 'string' || !oauthState) {
+    throw new Error('Could not start sign-in');
+  }
+
   await waitForGsi();
-  const code = await requestAuthCode(clientId);
+  const { code } = await requestAuthCode(clientId, oauthState);
 
   const res = await fetch(`${API_BASE}/exchangeCode`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code })
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({ code, state: oauthState })
   });
 
   if (!res.ok) {

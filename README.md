@@ -57,6 +57,7 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 │  ┌─────────────────────────────────────────────┐ │
 │  │  Express Server (server/index.js)           │ │
 │  │                                             │ │
+│  │  POST /api/oauthPrepare                     │ │
 │  │  POST /api/exchangeCode                     │ │
 │  │    → Google auth code → access + refresh    │ │
 │  │    → Encrypt & store refresh in Firestore   │ │
