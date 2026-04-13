@@ -4,8 +4,11 @@ import { useApp } from '../contexts/AppContext';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { CATEGORIES, CURRENCIES, type Expense, type SplitType } from '../types';
-import { calculateSplits } from '../utils/balance';
+import { CATEGORIES, CURRENCIES, type SplitType } from '../types';
+import {
+  calculateSplits,
+  inferSplitParticipantsFromExpense
+} from '../utils/balance';
 import {
   equalSplitRememberPreset,
   getPresetInvolvedMembers,
@@ -110,44 +113,6 @@ export default function AddExpensePage() {
   const [error, setError] = useState<string | null>(null);
   const hasInitializedNewExpense = useRef(false);
 
-  // The form intentionally hydrates editable local state from async sheet data.
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  const applyExistingExpense = useCallback((expense: Expense) => {
-    setDescription(expense.description);
-    setAmount(expense.cost.toString());
-    setDate(expense.date);
-    setCategory(expense.category);
-    setExpCurrency(expense.currency);
-    setPaidByLocal(expense.paidBy);
-    setSplitTypeLocal(expense.splitType);
-
-    const involvedSet = new Set<string>();
-    const values: Record<string, number> = {};
-    for (const [m, net] of Object.entries(expense.splits)) {
-      if (Math.abs(net) > 0.001 || m === expense.paidBy) {
-        involvedSet.add(m);
-      }
-      const share = expense.paidBy === m ? expense.cost - net : -net;
-      if (share > 0) values[m] = Math.round(share * 100) / 100;
-    }
-    if (involvedSet.size === 0) involvedSet.add(expense.paidBy);
-    setInvolved(involvedSet);
-
-    if (expense.splitType === 'exact') {
-      setSplitValues(values);
-    } else if (expense.splitType === 'percentage' && expense.cost > 0) {
-      const percentages: Record<string, number> = {};
-      for (const [m, v] of Object.entries(values)) {
-        percentages[m] = Math.round((v / expense.cost) * 10000) / 100;
-      }
-      setSplitValues(percentages);
-    } else if (expense.splitType === 'shares') {
-      setSplitValues(values);
-    } else {
-      setSplitValues({});
-    }
-  }, []);
-
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const initializeNewExpenseForm = useCallback(() => {
     hasInitializedNewExpense.current = true;
@@ -171,9 +136,35 @@ export default function AddExpensePage() {
 
   useEffect(() => {
     if (!existing) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    applyExistingExpense(existing);
-  }, [applyExistingExpense, existing]);
+    const expense = existing;
+    /* eslint-disable react-hooks/set-state-in-effect -- hydrate edit form from sheet */
+    setDescription(expense.description);
+    setAmount(expense.cost.toString());
+    setDate(expense.date);
+    setCategory(expense.category);
+    setExpCurrency(expense.currency);
+    setPaidByLocal(expense.paidBy);
+    setSplitTypeLocal(expense.splitType);
+
+    const { involved: involvedList, owedByMember: values } =
+      inferSplitParticipantsFromExpense(expense, members);
+    setInvolved(new Set(involvedList));
+
+    if (expense.splitType === 'exact') {
+      setSplitValues(values);
+    } else if (expense.splitType === 'percentage' && expense.cost > 0) {
+      const percentages: Record<string, number> = {};
+      for (const [m, v] of Object.entries(values)) {
+        percentages[m] = Math.round((v / expense.cost) * 10000) / 100;
+      }
+      setSplitValues(percentages);
+    } else if (expense.splitType === 'shares') {
+      setSplitValues(values);
+    } else {
+      setSplitValues({});
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [existing, members]);
 
   useEffect(() => {
     if (isEdit || hasInitializedNewExpense.current || members.length === 0)

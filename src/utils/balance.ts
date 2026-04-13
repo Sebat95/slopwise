@@ -118,3 +118,37 @@ export function calculateSplits(
 
   return splits;
 }
+
+const SPLIT_SHARE_THRESHOLD = 0.001;
+
+/**
+ * From persisted per-member net splits, recover who had a positive share of the bill
+ * (the "split among" set). Uses: owed = paidBy ? cost - net : -net.
+ *
+ * A payer who is not in the split subset only advances money (net = +cost) has owed 0
+ * and is excluded — fixing equal/exact UI when splitting among a subset.
+ */
+export function inferSplitParticipantsFromExpense(
+  expense: Pick<Expense, 'splits' | 'paidBy' | 'cost'>,
+  memberOrder: string[]
+): { involved: string[]; owedByMember: Record<string, number> } {
+  const owedByMember: Record<string, number> = {};
+  const involved: string[] = [];
+  const cost = expense.cost;
+  const paidBy = expense.paidBy;
+
+  for (const m of memberOrder) {
+    const net = expense.splits[m] ?? 0;
+    const owed = m === paidBy ? cost - net : -net;
+    if (owed > SPLIT_SHARE_THRESHOLD) {
+      involved.push(m);
+      owedByMember[m] = Math.round(owed * 100) / 100;
+    }
+  }
+
+  if (involved.length === 0 && paidBy) {
+    involved.push(paidBy);
+  }
+
+  return { involved, owedByMember };
+}
