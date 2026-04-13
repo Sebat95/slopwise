@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import Layout from '../components/Layout';
+import SignOutSection from '../components/SignOutSection';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
 import { exportToCSV, downloadCSV } from '../utils/csv';
 import {
-  LogOut,
   UserPlus,
   Download,
   FileSpreadsheet,
@@ -25,7 +24,6 @@ import {
 export default function SettingsPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { logout } = useAuth();
   const {
     spreadsheetId,
     spreadsheetName,
@@ -118,20 +116,6 @@ export default function SettingsPage() {
     const csv = exportToCSV(expenses, members);
     const filename = `${spreadsheetName || 'expenses'}_${new Date().toISOString().split('T')[0]}.csv`;
     downloadCSV(csv, filename);
-  };
-
-  const handleLogout = async () => {
-    const ok = await confirm({
-      title: 'Sign out?',
-      message: 'You will need to sign in again to access your spreadsheets.',
-      confirmLabel: 'Sign out',
-      cancelLabel: 'Cancel',
-      variant: 'danger'
-    });
-    if (ok) {
-      await logout();
-      navigate('/');
-    }
   };
 
   const handleDisconnect = async () => {
@@ -329,19 +313,7 @@ export default function SettingsPage() {
           </button>
         </section>
 
-        {/* Account */}
-        <section>
-          <h2 className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
-            Account
-          </h2>
-          <button
-            onClick={handleLogout}
-            className="bg-bg-card border-danger/20 hover:border-danger/40 flex w-full items-center gap-3 rounded-xl border p-3.5 transition-colors"
-          >
-            <LogOut size={18} className="text-danger" />
-            <span className="text-danger text-sm font-medium">Sign Out</span>
-          </button>
-        </section>
+        <SignOutSection />
       </div>
 
       {/* Add Member Modal */}

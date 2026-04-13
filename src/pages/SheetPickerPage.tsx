@@ -6,6 +6,7 @@ import { parseCompetitorCSV } from '../utils/csv';
 import type { SpreadsheetInfo } from '../types';
 import { CURRENCIES } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner';
+import SignOutSection from '../components/SignOutSection';
 import {
   FileSpreadsheet,
   Plus,
@@ -198,6 +199,8 @@ export default function SheetPickerPage() {
           >
             {creating ? 'Creating...' : 'Create Group'}
           </button>
+
+          <SignOutSection className="mt-8" />
         </div>
       </div>
     );
@@ -251,6 +254,8 @@ export default function SheetPickerPage() {
           >
             {importing ? 'Importing...' : 'Import & Create Sheet'}
           </button>
+
+          <SignOutSection className="mt-8" />
         </div>
       </div>
     );
@@ -334,6 +339,8 @@ export default function SheetPickerPage() {
           ))}
         </div>
       )}
+
+      <SignOutSection className="mt-8" />
     </div>
   );
 }
