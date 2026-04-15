@@ -1,4 +1,5 @@
 import type { Expense, Balance } from '../types';
+import { quantizeMoneyTruncate } from './format';
 
 export function calculateNetBalances(
   expenses: Expense[],
@@ -14,7 +15,7 @@ export function calculateNetBalances(
   }
 
   for (const m of members) {
-    balances[m] = Math.round(balances[m] * 100) / 100;
+    balances[m] = quantizeMoneyTruncate(balances[m]);
   }
 
   return balances;
@@ -30,7 +31,7 @@ export function simplifyDebts(
   const debtors: { name: string; amount: number }[] = [];
 
   for (const [name, net] of Object.entries(nets)) {
-    const rounded = Math.round(net * 100) / 100;
+    const rounded = quantizeMoneyTruncate(net);
     if (rounded > 0.01) creditors.push({ name, amount: rounded });
     else if (rounded < -0.01) debtors.push({ name, amount: -rounded });
   }
@@ -48,7 +49,7 @@ export function simplifyDebts(
       settlements.push({
         from: debtors[di].name,
         to: creditors[ci].name,
-        amount: Math.round(amount * 100) / 100
+        amount: quantizeMoneyTruncate(amount)
       });
     }
     creditors[ci].amount -= amount;
@@ -106,14 +107,15 @@ export function calculateSplits(
   for (const m of members) {
     const paid = m === paidBy ? cost : 0;
     const owes = shares[m] ?? 0;
-    splits[m] = Math.round((paid - owes) * 100) / 100;
+    splits[m] = quantizeMoneyTruncate(paid - owes);
   }
 
   // Force splits to sum to exactly zero — absorb any rounding into payer
-  const sum =
-    Math.round(Object.values(splits).reduce((a, b) => a + b, 0) * 100) / 100;
+  const sum = quantizeMoneyTruncate(
+    Object.values(splits).reduce((a, b) => a + b, 0)
+  );
   if (sum !== 0) {
-    splits[paidBy] = Math.round((splits[paidBy] - sum) * 100) / 100;
+    splits[paidBy] = quantizeMoneyTruncate(splits[paidBy] - sum);
   }
 
   return splits;
@@ -142,7 +144,7 @@ export function inferSplitParticipantsFromExpense(
     const owed = m === paidBy ? cost - net : -net;
     if (owed > SPLIT_SHARE_THRESHOLD) {
       involved.push(m);
-      owedByMember[m] = Math.round(owed * 100) / 100;
+      owedByMember[m] = quantizeMoneyTruncate(owed);
     }
   }
 

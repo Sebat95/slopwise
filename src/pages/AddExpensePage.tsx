@@ -18,7 +18,10 @@ import {
   todayStr,
   formatCurrency,
   getCategoryEmoji,
-  parseAmount
+  parseAmount,
+  quantizeMoneyTruncate,
+  sanitizeMoneyInput,
+  formatMoneyInputFromNumber
 } from '../utils/format';
 import {
   ChevronLeft,
@@ -87,6 +90,24 @@ export default function AddExpensePage() {
     [getPresetValues]
   );
 
+  const [splitRaw, setSplitRaw] = useState<Record<string, string>>({});
+
+  const setSplitStateFromNumbers = useCallback(
+    (nums: Record<string, number>) => {
+      setSplitRaw(
+        Object.fromEntries(
+          Object.entries(nums).map(([k, v]) => [
+            k,
+            formatMoneyInputFromNumber(v)
+          ])
+        )
+      );
+    },
+    []
+  );
+
+  const [involved, setInvolved] = useState<Set<string>>(new Set());
+
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(todayStr());
@@ -104,16 +125,20 @@ export default function AddExpensePage() {
     if (!isEdit) {
       const nextInvolved = getPresetInvolved(type);
       setInvolved(nextInvolved);
-      setSplitValues(buildSplitValues(type, nextInvolved));
+      setSplitStateFromNumbers(buildSplitValues(type, nextInvolved));
     }
   };
-  const [splitValues, setSplitValues] = useState<Record<string, number>>({});
-  const [involved, setInvolved] = useState<Set<string>>(new Set());
+  const splitValues = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const m of members) {
+      out[m] = parseAmount(splitRaw[m] ?? '');
+    }
+    return out;
+  }, [splitRaw, members]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasInitializedNewExpense = useRef(false);
 
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const initializeNewExpenseForm = useCallback(() => {
     hasInitializedNewExpense.current = true;
     const nextSplitType = lastSplitType;
@@ -124,14 +149,15 @@ export default function AddExpensePage() {
     setSplitTypeLocal(nextSplitType);
     const nextInvolved = getPresetInvolved(nextSplitType);
     setInvolved(nextInvolved);
-    setSplitValues(buildSplitValues(nextSplitType, nextInvolved));
+    setSplitStateFromNumbers(buildSplitValues(nextSplitType, nextInvolved));
   }, [
     buildSplitValues,
     currency,
     getPresetInvolved,
     lastPaidBy,
     lastSplitType,
-    members
+    members,
+    setSplitStateFromNumbers
   ]);
 
   useEffect(() => {
@@ -139,7 +165,7 @@ export default function AddExpensePage() {
     const expense = existing;
     /* eslint-disable react-hooks/set-state-in-effect -- hydrate edit form from sheet */
     setDescription(expense.description);
-    setAmount(expense.cost.toString());
+    setAmount(formatMoneyInputFromNumber(expense.cost));
     setDate(expense.date);
     setCategory(expense.category);
     setExpCurrency(expense.currency);
@@ -151,26 +177,26 @@ export default function AddExpensePage() {
     setInvolved(new Set(involvedList));
 
     if (expense.splitType === 'exact') {
-      setSplitValues(values);
+      setSplitStateFromNumbers(values);
     } else if (expense.splitType === 'percentage' && expense.cost > 0) {
       const percentages: Record<string, number> = {};
       for (const [m, v] of Object.entries(values)) {
-        percentages[m] = Math.round((v / expense.cost) * 10000) / 100;
+        percentages[m] = quantizeMoneyTruncate((v / expense.cost) * 100);
       }
-      setSplitValues(percentages);
+      setSplitStateFromNumbers(percentages);
     } else if (expense.splitType === 'shares') {
-      setSplitValues(values);
+      setSplitStateFromNumbers(values);
     } else {
-      setSplitValues({});
+      setSplitRaw({});
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [existing, members]);
+  }, [existing, members, setSplitStateFromNumbers]);
 
   useEffect(() => {
     if (isEdit || hasInitializedNewExpense.current || members.length === 0)
       return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- boot new expense form once members load
     initializeNewExpenseForm();
   }, [initializeNewExpenseForm, isEdit, members.length]);
 
@@ -199,15 +225,18 @@ export default function AddExpensePage() {
 
     setInvolved(next);
     if (splitType === 'shares' && isAdding) {
-      setSplitValues((prev) => {
-        if ((prev[m] ?? 0) > 0) return prev;
-        return { ...prev, [m]: 1 };
+      setSplitRaw((prev) => {
+        if (parseAmount(prev[m] ?? '') > 0) return prev;
+        return { ...prev, [m]: '1' };
       });
     }
   };
 
-  const setSplitValue = (member: string, val: number) => {
-    setSplitValues((prev) => ({ ...prev, [member]: val }));
+  const setSplitRawForMember = (member: string, raw: string) => {
+    setSplitRaw((prev) => ({
+      ...prev,
+      [member]: sanitizeMoneyInput(raw)
+    }));
   };
 
   const handleSave = async () => {
@@ -366,7 +395,7 @@ export default function AddExpensePage() {
                 type="text"
                 inputMode="decimal"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => setAmount(sanitizeMoneyInput(e.target.value))}
                 placeholder="0.00"
                 className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
               />
@@ -502,23 +531,24 @@ export default function AddExpensePage() {
                     )}
                     {isIn && splitType === 'exact' && (
                       <input
-                        type="number"
-                        value={splitValues[m] ?? ''}
+                        type="text"
+                        inputMode="decimal"
+                        value={splitRaw[m] ?? ''}
                         onChange={(e) =>
-                          setSplitValue(m, parseAmount(e.target.value))
+                          setSplitRawForMember(m, e.target.value)
                         }
                         placeholder="0.00"
-                        step="0.01"
                         className="bg-bg-input border-border text-text-primary focus:border-primary w-24 rounded-lg border px-2 py-1.5 text-right text-sm focus:outline-none"
                       />
                     )}
                     {isIn && splitType === 'percentage' && (
                       <div className="flex items-center gap-1">
                         <input
-                          type="number"
-                          value={splitValues[m] ?? ''}
+                          type="text"
+                          inputMode="decimal"
+                          value={splitRaw[m] ?? ''}
                           onChange={(e) =>
-                            setSplitValue(m, parseAmount(e.target.value))
+                            setSplitRawForMember(m, e.target.value)
                           }
                           placeholder="0"
                           className="bg-bg-input border-border text-text-primary focus:border-primary w-16 rounded-lg border px-2 py-1.5 text-right text-sm focus:outline-none"
@@ -529,12 +559,12 @@ export default function AddExpensePage() {
                     {isIn && splitType === 'shares' && (
                       <div className="flex items-center gap-1">
                         <input
-                          type="number"
-                          value={splitValues[m] ?? 1}
+                          type="text"
+                          inputMode="decimal"
+                          value={m in splitRaw ? splitRaw[m] : '1'}
                           onChange={(e) =>
-                            setSplitValue(m, parseAmount(e.target.value))
+                            setSplitRawForMember(m, e.target.value)
                           }
-                          min="0"
                           className="bg-bg-input border-border text-text-primary focus:border-primary w-16 rounded-lg border px-2 py-1.5 text-right text-sm focus:outline-none"
                         />
                         <span className="text-text-muted text-xs">shares</span>

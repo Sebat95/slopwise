@@ -8,7 +8,11 @@ import type {
 } from '../types';
 import { FIXED_COLUMNS } from '../types';
 import { notifySessionExpired } from './google-auth';
-import { normalizeCategory, parseLooseNumber } from '../utils/format';
+import {
+  normalizeCategory,
+  parseSheetMoney,
+  quantizeMoneyTruncate
+} from '../utils/format';
 import { v4 as uuidv4 } from 'uuid';
 
 const API_BASE = '/api';
@@ -32,16 +36,13 @@ function isSplitType(value: string | undefined): value is SplitType {
   return value !== undefined && SPLIT_TYPES.includes(value as SplitType);
 }
 
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
+/** Sheet storage: always `###.##` (dot decimal, no thousands). */
 function formatMoney(value: number): string {
-  return roundMoney(value).toFixed(2);
+  return quantizeMoneyTruncate(value).toFixed(2);
 }
 
 function trimTrailingZeroSplits(values: number[]): number[] {
-  const next = values.map(roundMoney);
+  const next = values.map(quantizeMoneyTruncate);
   while (next.length > 0 && Math.abs(next[next.length - 1]) < 0.005) {
     next.pop();
   }
@@ -89,10 +90,10 @@ function buildExpenseSignatureFromRow(
     row[0] || '',
     row[1] || '',
     row[2] || 'General',
-    parseLooseNumber(row[3] || '0'),
+    parseSheetMoney(row[3] || '0'),
     row[4] || fallbackCurrency,
     memberColumns.map((memberColumn) =>
-      parseLooseNumber(row[memberColumn.colIndex] || '0')
+      parseSheetMoney(row[memberColumn.colIndex] || '0')
     )
   );
 }
@@ -400,8 +401,8 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     let maxPositive = -Infinity;
 
     for (const memberColumn of memberColumns) {
-      const val = parseLooseNumber(row[memberColumn.colIndex] || '0');
-      splits[memberColumn.name] = roundMoney(val);
+      const val = parseSheetMoney(row[memberColumn.colIndex] || '0');
+      splits[memberColumn.name] = quantizeMoneyTruncate(val);
       if (val > maxPositive) {
         maxPositive = val;
         inferredPaidBy = memberColumn.name;
@@ -421,14 +422,14 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     const splitType = matchingMeta?.splitType || 'equal';
 
     // Force splits to sum to exactly zero — absorb any imbalance into payer
-    const splitSum = roundMoney(
+    const splitSum = quantizeMoneyTruncate(
       Object.values(splits).reduce((a, b) => a + b, 0)
     );
     if (paidBy && splitSum !== 0) {
-      splits[paidBy] = roundMoney(splits[paidBy] - splitSum);
+      splits[paidBy] = quantizeMoneyTruncate(splits[paidBy] - splitSum);
     }
 
-    const cost = parseLooseNumber(row[3] || '0');
+    const cost = parseSheetMoney(row[3] || '0');
     const category = normalizeCategory(row[2] || 'General');
     const expCurrency = row[4] || currency;
 

@@ -10,7 +10,11 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
 import { simplifyDebts } from '../utils/balance';
-import { formatCurrency, parseAmount } from '../utils/format';
+import {
+  formatCurrency,
+  parseAmount,
+  sanitizeMoneyInput
+} from '../utils/format';
 import {
   PlusCircle,
   Receipt,
@@ -378,7 +382,9 @@ export default function DashboardPage() {
               type="text"
               inputMode="decimal"
               value={settleAmount}
-              onChange={(e) => setSettleAmount(e.target.value)}
+              onChange={(e) =>
+                setSettleAmount(sanitizeMoneyInput(e.target.value))
+              }
               placeholder="0.00"
               className="bg-bg-input border-border text-text-primary placeholder:text-text-muted focus:border-primary w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
             />
