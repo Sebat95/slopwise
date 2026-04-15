@@ -28,12 +28,12 @@ describe('parseCompetitorCSV', () => {
     expect(e.date).toBe('2024-01-15');
     expect(e.description).toBe('Lunch');
     expect(e.category).toBe('Dining out');
-    expect(e.cost).toBe(24.5);
+    expect(e.cost).toBe(2450);
     expect(e.currency).toBe('USD');
     expect(e.paidBy).toBe('Bob');
     expect(e.splitType).toBe('equal');
-    expect(e.splits.Alice).toBe(-12.25);
-    expect(e.splits.Bob).toBe(12.25);
+    expect(e.splits.Alice).toBe(-1225);
+    expect(e.splits.Bob).toBe(1225);
   });
 
   it('normalizes slash dates to ISO', () => {
@@ -88,7 +88,7 @@ describe('exportToCSV + parseCompetitorCSV', () => {
   it('round-trips expenses and members (stable ids via mocked uuid)', () => {
     const members = ['Alice', 'Bob'];
     const splits = calculateSplits(
-      99.99,
+      9999,
       'Alice',
       members,
       'equal',
@@ -101,7 +101,7 @@ describe('exportToCSV + parseCompetitorCSV', () => {
         date: '2024-03-10',
         description: 'Groceries',
         category: 'Groceries',
-        cost: 99.99,
+        cost: 9999,
         currency: 'EUR',
         paidBy: 'Alice',
         splitType: 'equal',

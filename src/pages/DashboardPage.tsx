@@ -12,7 +12,7 @@ import Modal from '../components/Modal';
 import { simplifyDebts } from '../utils/balance';
 import {
   formatCurrency,
-  parseAmount,
+  parseMoneyCents,
   sanitizeMoneyInput
 } from '../utils/format';
 import {
@@ -95,7 +95,7 @@ export default function DashboardPage() {
     const amt = getOwedAmount(f, t);
     setSettleFrom(f);
     setSettleTo(t);
-    setSettleAmount(amt > 0 ? amt.toFixed(2) : '');
+    setSettleAmount(amt > 0 ? `${(amt / 100).toFixed(2)}` : '');
     setShowSettle(true);
   };
 
@@ -105,7 +105,7 @@ export default function DashboardPage() {
     setSettleFrom(newFrom);
     setSettleTo(newTo);
     const amt = getOwedAmount(newFrom, newTo);
-    setSettleAmount(amt > 0 ? amt.toFixed(2) : '0.00');
+    setSettleAmount(amt > 0 ? `${(amt / 100).toFixed(2)}` : '0.00');
   };
 
   const handleSettleFromChange = (val: string) => {
@@ -114,17 +114,17 @@ export default function DashboardPage() {
       val === settleTo ? members.find((m) => m !== val) || '' : settleTo;
     setSettleTo(to);
     const amt = getOwedAmount(val, to);
-    setSettleAmount(amt > 0 ? amt.toFixed(2) : '');
+    setSettleAmount(amt > 0 ? `${(amt / 100).toFixed(2)}` : '');
   };
 
   const handleSettleToChange = (val: string) => {
     setSettleTo(val);
     const amt = getOwedAmount(settleFrom, val);
-    setSettleAmount(amt > 0 ? amt.toFixed(2) : '');
+    setSettleAmount(amt > 0 ? `${(amt / 100).toFixed(2)}` : '');
   };
 
   const handleSettle = async () => {
-    const amt = parseAmount(settleAmount);
+    const amt = parseMoneyCents(settleAmount);
     if (!settleFrom || !settleTo || settleFrom === settleTo || !amt || amt <= 0)
       return;
     setSettling(true);
@@ -397,7 +397,7 @@ export default function DashboardPage() {
               !settleFrom ||
               !settleTo ||
               settleFrom === settleTo ||
-              !parseAmount(settleAmount)
+              !parseMoneyCents(settleAmount)
             }
             className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >

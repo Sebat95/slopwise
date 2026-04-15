@@ -18,10 +18,9 @@ import {
   todayStr,
   formatCurrency,
   getCategoryEmoji,
-  parseAmount,
-  quantizeMoneyTruncate,
+  parseMoneyCents,
   sanitizeMoneyInput,
-  formatMoneyInputFromNumber
+  formatMoneyInputFromCents
 } from '../utils/format';
 import {
   ChevronLeft,
@@ -98,7 +97,7 @@ export default function AddExpensePage() {
         Object.fromEntries(
           Object.entries(nums).map(([k, v]) => [
             k,
-            formatMoneyInputFromNumber(v)
+            formatMoneyInputFromCents(v)
           ])
         )
       );
@@ -131,10 +130,14 @@ export default function AddExpensePage() {
   const splitValues = useMemo(() => {
     const out: Record<string, number> = {};
     for (const m of members) {
-      out[m] = parseAmount(splitRaw[m] ?? '');
+      const raw = splitRaw[m] ?? '';
+      out[m] =
+        splitType === 'shares'
+          ? Math.trunc(parseMoneyCents(raw) / 100)
+          : parseMoneyCents(raw);
     }
     return out;
-  }, [splitRaw, members]);
+  }, [splitRaw, members, splitType]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasInitializedNewExpense = useRef(false);
@@ -165,7 +168,7 @@ export default function AddExpensePage() {
     const expense = existing;
     /* eslint-disable react-hooks/set-state-in-effect -- hydrate edit form from sheet */
     setDescription(expense.description);
-    setAmount(formatMoneyInputFromNumber(expense.cost));
+    setAmount(formatMoneyInputFromCents(expense.cost));
     setDate(expense.date);
     setCategory(expense.category);
     setExpCurrency(expense.currency);
@@ -181,7 +184,8 @@ export default function AddExpensePage() {
     } else if (expense.splitType === 'percentage' && expense.cost > 0) {
       const percentages: Record<string, number> = {};
       for (const [m, v] of Object.entries(values)) {
-        percentages[m] = quantizeMoneyTruncate((v / expense.cost) * 100);
+        // Store as basis points (percent * 100) to avoid float drift.
+        percentages[m] = Math.trunc((v * 10000) / expense.cost);
       }
       setSplitStateFromNumbers(percentages);
     } else if (expense.splitType === 'shares') {
@@ -200,7 +204,7 @@ export default function AddExpensePage() {
     initializeNewExpenseForm();
   }, [initializeNewExpenseForm, isEdit, members.length]);
 
-  const cost = parseAmount(amount);
+  const cost = parseMoneyCents(amount);
 
   if (isLoading && members.length === 0) {
     return (
@@ -226,7 +230,7 @@ export default function AddExpensePage() {
     setInvolved(next);
     if (splitType === 'shares' && isAdding) {
       setSplitRaw((prev) => {
-        if (parseAmount(prev[m] ?? '') > 0) return prev;
+        if (parseMoneyCents(prev[m] ?? '') > 0) return prev;
         return { ...prev, [m]: '1' };
       });
     }
@@ -262,7 +266,7 @@ export default function AddExpensePage() {
         (sum, m) => sum + (splitValues[m] || 0),
         0
       );
-      if (Math.abs(total - cost) > 0.01) {
+      if (total !== cost) {
         setError(
           `Amounts must add up to ${formatCurrency(cost, expCurrency)} (currently ${formatCurrency(total, expCurrency)})`
         );
@@ -275,9 +279,9 @@ export default function AddExpensePage() {
         (sum, m) => sum + (splitValues[m] || 0),
         0
       );
-      if (Math.abs(total - 100) > 0.01) {
+      if (total !== 10000) {
         setError(
-          `Percentages must add up to 100% (currently ${total.toFixed(1)}%)`
+          `Percentages must add up to 100% (currently ${(total / 100).toFixed(2)}%)`
         );
         return;
       }
@@ -344,7 +348,8 @@ export default function AddExpensePage() {
   };
 
   const involvedArr = [...involved];
-  const equalShare = involvedArr.length > 0 ? cost / involvedArr.length : 0;
+  const equalShare =
+    involvedArr.length > 0 ? Math.trunc(cost / involvedArr.length) : 0;
 
   return (
     <Layout showNav={false}>
@@ -588,9 +593,10 @@ export default function AddExpensePage() {
             {splitType === 'percentage' && (
               <div className="text-text-muted mt-2 text-xs">
                 Total:{' '}
-                {[...involved]
-                  .reduce((s, m) => s + (splitValues[m] || 0), 0)
-                  .toFixed(1)}
+                {(
+                  [...involved].reduce((s, m) => s + (splitValues[m] || 0), 0) /
+                  100
+                ).toFixed(2)}
                 % / 100%
               </div>
             )}

@@ -71,7 +71,7 @@ describe('calculateSplits', () => {
       'A',
       members,
       'percentage',
-      { B: 30, C: 70 },
+      { B: 3000, C: 7000 },
       ['B', 'C']
     );
     expect(splits.A).toBe(200);

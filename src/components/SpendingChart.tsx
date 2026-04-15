@@ -244,7 +244,11 @@ export default function SpendingChart({
               className="fill-text-muted"
               fontSize={10}
             >
-              {tick >= 1000 ? `${(tick / 1000).toFixed(1)}k` : tick}
+              {(() => {
+                const units = tick / 100;
+                if (units >= 1000) return `${(units / 1000).toFixed(1)}k`;
+                return units.toFixed(0);
+              })()}
             </text>
           </g>
         ))}

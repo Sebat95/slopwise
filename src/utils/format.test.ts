@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   parseCSVNumber,
   parseAmount,
-  parseSheetMoney,
+  parseSheetMoneyCents,
+  parseMoneyCents,
   quantizeMoneyTruncate,
   isValidMoneyInputString,
   sanitizeMoneyInput
@@ -49,19 +50,27 @@ describe('format utils', () => {
     });
   });
 
-  describe('parseSheetMoney (Slopwise sheet cells)', () => {
-    it('accepts strict one-separator forms', () => {
-      expect(parseSheetMoney('12.34')).toBe(12.34);
-      expect(parseSheetMoney('12,34')).toBe(12.34);
+  describe('parseSheetMoneyCents (Slopwise sheet cells)', () => {
+    it('treats integer strings as cents', () => {
+      expect(parseSheetMoneyCents('560')).toBe(560);
+    });
+
+    it('accepts legacy decimal strings by converting to cents exactly', () => {
+      expect(parseSheetMoneyCents('5.60')).toBe(560);
+      expect(parseSheetMoneyCents('5,60')).toBe(560);
     });
 
     it('rejects thousands-style strings that CSV import would accept', () => {
-      expect(parseSheetMoney('1,234.56')).toBe(0);
-      expect(parseSheetMoney('1.234,56')).toBe(0);
+      expect(parseSheetMoneyCents('1,234.56')).toBe(0);
+      expect(parseSheetMoneyCents('1.234,56')).toBe(0);
     });
+  });
 
-    it('quantizes numeric API values to cents', () => {
-      expect(parseSheetMoney(12.345)).toBe(12.34);
+  describe('parseMoneyCents', () => {
+    it('parses strict money to cents without rounding up', () => {
+      expect(parseMoneyCents('5.60')).toBe(560);
+      expect(parseMoneyCents('5.699')).toBe(569);
+      expect(parseMoneyCents('0.6')).toBe(60);
     });
   });
 

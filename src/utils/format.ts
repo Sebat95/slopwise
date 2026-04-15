@@ -94,6 +94,35 @@ function truncateDecimalFraction(body: string, maxDigits: number): string {
   return (neg ? '-' : '') + intPart + '.' + frac;
 }
 
+function centsFromNormalizedDecimalString(normalized: string): number {
+  // `normalized` uses '.' as decimal separator and has only digits/optional leading '-'.
+  const neg = normalized.startsWith('-');
+  const u = neg ? normalized.slice(1) : normalized;
+  const [intRaw, fracRaw = ''] = u.split('.');
+  const intPart = intRaw ? parseInt(intRaw, 10) : 0;
+  const frac2 = (fracRaw + '00').slice(0, 2);
+  const fracPart = frac2 ? parseInt(frac2, 10) : 0;
+  const cents = intPart * 100 + fracPart;
+  return neg ? -cents : cents;
+}
+
+/**
+ * Parse user-entered money as integer cents (never rounds up, max 2 decimals).
+ * Returns 0 for invalid inputs.
+ */
+export function parseMoneyCents(input: string): number {
+  const raw = String(input).trim();
+  if (!raw) return 0;
+
+  const isNegativeByParens = raw.startsWith('(') && raw.endsWith(')');
+  const cleaned = cleanStrictMoneyBody(raw);
+  if (!cleaned) return 0;
+
+  const truncated = truncateDecimalFraction(cleaned, 2);
+  const cents = centsFromNormalizedDecimalString(truncated);
+  return isNegativeByParens ? -Math.abs(cents) : cents;
+}
+
 /**
  * Quantize to at most 2 decimal places by truncating toward zero (never rounds up).
  * Uses a fixed string form so float noise like 0.29 does not become 0.28.
@@ -118,6 +147,19 @@ export function formatMoneyInputFromNumber(n: number): string {
   return String(q);
 }
 
+/** Canonical text for hydrating a money input from integer cents (`.` decimal). */
+export function formatMoneyInputFromCents(cents: number): string {
+  if (!Number.isFinite(cents) || cents === 0) return '';
+  const v = Math.trunc(cents);
+  const neg = v < 0;
+  const abs = Math.abs(v);
+  const whole = Math.trunc(abs / 100);
+  const frac = String(abs % 100).padStart(2, '0');
+  // Keep 2 decimals for stable round-trips, but trim trailing ".00".
+  const s = frac === '00' ? String(whole) : `${whole}.${frac}`;
+  return neg ? `-${s}` : s;
+}
+
 /**
  * Parse numeric strings from competitor CSV imports (thousands, locale decimals, etc.).
  * Do not use for Google Sheet cells written by Slopwise — use {@link parseSheetMoney}.
@@ -138,6 +180,30 @@ export function parseCSVNumber(
   const parsed = parseFloat(cleaned);
   if (!Number.isFinite(parsed)) return 0;
   return isNegativeByParens ? -parsed : parsed;
+}
+
+/**
+ * Parse competitor CSV money fields into integer cents, without float precision loss.
+ * This uses the loose CSV normalizer, then converts the resulting normalized decimal
+ * string to cents via string math.
+ */
+export function parseCSVMoneyCents(
+  value: string | number | null | undefined
+): number {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 0;
+    // Best-effort: convert number to normalized string first.
+    return centsFromNormalizedDecimalString(value.toString());
+  }
+  if (value == null) return 0;
+  const raw = String(value).trim();
+  if (!raw) return 0;
+  const isNegativeByParens = raw.startsWith('(') && raw.endsWith(')');
+  const cleaned = cleanLooseNumericBody(raw);
+  if (!cleaned) return 0;
+  const truncated = truncateDecimalFraction(cleaned, 2);
+  const cents = centsFromNormalizedDecimalString(truncated);
+  return isNegativeByParens ? -Math.abs(cents) : cents;
 }
 
 function cleanStrictMoneyBody(raw: string): string | null {
@@ -183,6 +249,31 @@ export function parseSheetMoney(
   return parseAmount(String(value));
 }
 
+/**
+ * Read cents from a Slopwise sheet cell.
+ * - If the cell is a plain integer string (no '.' or ','), treat it as cents.
+ * - If it contains a decimal separator, treat it as legacy units and parse to cents.
+ * - If the Sheets API provides a number, treat it as cents (modern) unless it looks fractional.
+ */
+export function parseSheetMoneyCents(
+  value: string | number | null | undefined
+): number {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 0;
+    if (Number.isInteger(value)) return value;
+    // Legacy numeric value with decimals
+    return parseMoneyCents(String(value));
+  }
+  if (value == null) return 0;
+  const raw = String(value).trim();
+  if (!raw) return 0;
+  if (!raw.includes('.') && !raw.includes(',')) {
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return parseMoneyCents(raw);
+}
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$',
   EUR: '€',
@@ -201,9 +292,14 @@ export function formatCurrency(
   currency: string = 'USD'
 ): string {
   const symbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
-  const abs = Math.abs(amount);
-  const formatted = abs.toFixed(2);
-  return amount < 0 ? `-${symbol}${formatted}` : `${symbol}${formatted}`;
+  // `amount` is integer cents throughout the app.
+  const cents = Number.isFinite(amount) ? Math.trunc(amount) : 0;
+  const neg = cents < 0;
+  const abs = Math.abs(cents);
+  const whole = Math.trunc(abs / 100);
+  const frac = String(abs % 100).padStart(2, '0');
+  const formatted = `${whole}.${frac}`;
+  return neg ? `-${symbol}${formatted}` : `${symbol}${formatted}`;
 }
 
 export function formatDateShort(dateStr: string): string {

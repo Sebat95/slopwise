@@ -1,6 +1,6 @@
 import type { Expense } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { parseCSVNumber } from './format';
+import { parseCSVMoneyCents } from './format';
 
 const PAID_BY_COLUMN = '_slopwise_paid_by';
 const SPLIT_TYPE_COLUMN = '_slopwise_split_type';
@@ -67,7 +67,7 @@ function resolveSplitType(
   return parseSplitType(persistedSplitType) || 'equal';
 }
 
-/** Splitwise-style CSV: {@link parseCSVNumber} tolerates thousands / locale decimals. */
+/** Splitwise-style CSV: `parseCSVMoneyCents` tolerates thousands / locale decimals. */
 export function parseCompetitorCSV(csvText: string): {
   members: string[];
   expenses: Expense[];
@@ -102,7 +102,7 @@ export function parseCompetitorCSV(csvText: string): {
     const date = cols[0]?.trim() || '';
     const description = cols[1]?.trim() || '';
     const category = cols[2]?.trim() || 'General';
-    const cost = parseCSVNumber(cols[3]?.trim() || '0');
+    const cost = parseCSVMoneyCents(cols[3]?.trim() || '0');
     const currency = cols[4]?.trim() || 'USD';
 
     if (!date || cost === 0) continue;
@@ -110,7 +110,7 @@ export function parseCompetitorCSV(csvText: string): {
     const splits: Record<string, number> = {};
 
     for (const { header, index } of memberColumns) {
-      splits[header] = parseCSVNumber(cols[index]?.trim() || '0');
+      splits[header] = parseCSVMoneyCents(cols[index]?.trim() || '0');
     }
 
     // Third-party exports do not include Slopwise metadata, so keep a
@@ -158,9 +158,9 @@ export function exportToCSV(expenses: Expense[], members: string[]): string {
       expense.date,
       expense.description,
       expense.category,
-      expense.cost.toFixed(2),
+      (expense.cost / 100).toFixed(2),
       expense.currency,
-      ...members.map((m) => (expense.splits[m] ?? 0).toFixed(2)),
+      ...members.map((m) => ((expense.splits[m] ?? 0) / 100).toFixed(2)),
       expense.paidBy,
       expense.splitType
     ];

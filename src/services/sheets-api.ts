@@ -8,11 +8,7 @@ import type {
 } from '../types';
 import { FIXED_COLUMNS } from '../types';
 import { notifySessionExpired } from './google-auth';
-import {
-  normalizeCategory,
-  parseSheetMoney,
-  quantizeMoneyTruncate
-} from '../utils/format';
+import { normalizeCategory, parseSheetMoneyCents } from '../utils/format';
 import { v4 as uuidv4 } from 'uuid';
 import { absorbSplitSumIntoPayer } from '../utils/balance';
 import { emptySplitValuePresets } from '../utils/split-presets';
@@ -34,14 +30,14 @@ function isSplitType(value: string | undefined): value is SplitType {
   return value !== undefined && SPLIT_TYPES.includes(value as SplitType);
 }
 
-/** Sheet storage: always `###.##` (dot decimal, no thousands). */
+/** Sheet storage: always integer cents (no decimals, no thousands). */
 function formatMoney(value: number): string {
-  return quantizeMoneyTruncate(value).toFixed(2);
+  return String(Math.trunc(value));
 }
 
 function trimTrailingZeroSplits(values: number[]): number[] {
-  const next = values.map(quantizeMoneyTruncate);
-  while (next.length > 0 && Math.abs(next[next.length - 1]) < 0.005) {
+  const next = values.map((v) => Math.trunc(v));
+  while (next.length > 0 && Math.abs(next[next.length - 1]) < 1) {
     next.pop();
   }
   return next;
@@ -59,9 +55,9 @@ function buildExpenseSignature(
     date,
     description,
     category,
-    cost: formatMoney(cost),
+    costCents: Math.trunc(cost),
     currency,
-    splits: trimTrailingZeroSplits(splitValues).map(formatMoney)
+    splitsCents: trimTrailingZeroSplits(splitValues).map((v) => Math.trunc(v))
   });
 }
 
@@ -88,10 +84,10 @@ function buildExpenseSignatureFromRow(
     row[0] || '',
     row[1] || '',
     row[2] || 'General',
-    parseSheetMoney(row[3] || '0'),
+    parseSheetMoneyCents(row[3] || '0'),
     row[4] || fallbackCurrency,
     memberColumns.map((memberColumn) =>
-      parseSheetMoney(row[memberColumn.colIndex] || '0')
+      parseSheetMoneyCents(row[memberColumn.colIndex] || '0')
     )
   );
 }
@@ -399,8 +395,8 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     let maxPositive = -Infinity;
 
     for (const memberColumn of memberColumns) {
-      const val = parseSheetMoney(row[memberColumn.colIndex] || '0');
-      splits[memberColumn.name] = quantizeMoneyTruncate(val);
+      const val = parseSheetMoneyCents(row[memberColumn.colIndex] || '0');
+      splits[memberColumn.name] = Math.trunc(val);
       if (val > maxPositive) {
         maxPositive = val;
         inferredPaidBy = memberColumn.name;
@@ -421,7 +417,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
 
     absorbSplitSumIntoPayer(splits, paidBy);
 
-    const cost = parseSheetMoney(row[3] || '0');
+    const cost = parseSheetMoneyCents(row[3] || '0');
     const category = normalizeCategory(row[2] || 'General');
     const expCurrency = row[4] || currency;
 

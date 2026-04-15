@@ -1,5 +1,4 @@
 import type { Expense, Balance } from '../types';
-import { quantizeMoneyTruncate } from './format';
 
 export function calculateNetBalances(
   expenses: Expense[],
@@ -12,10 +11,6 @@ export function calculateNetBalances(
     for (const member of members) {
       balances[member] += expense.splits[member] ?? 0;
     }
-  }
-
-  for (const m of members) {
-    balances[m] = quantizeMoneyTruncate(balances[m]);
   }
 
   return balances;
@@ -31,9 +26,9 @@ export function simplifyDebts(
   const debtors: { name: string; amount: number }[] = [];
 
   for (const [name, net] of Object.entries(nets)) {
-    const rounded = quantizeMoneyTruncate(net);
-    if (rounded > 0.01) creditors.push({ name, amount: rounded });
-    else if (rounded < -0.01) debtors.push({ name, amount: -rounded });
+    const cents = Math.trunc(net);
+    if (cents > 0) creditors.push({ name, amount: cents });
+    else if (cents < 0) debtors.push({ name, amount: -cents });
   }
 
   creditors.sort((a, b) => b.amount - a.amount);
@@ -45,45 +40,42 @@ export function simplifyDebts(
 
   while (ci < creditors.length && di < debtors.length) {
     const amount = Math.min(creditors[ci].amount, debtors[di].amount);
-    if (amount > 0.01) {
+    if (amount > 0) {
       settlements.push({
         from: debtors[di].name,
         to: creditors[ci].name,
-        amount: quantizeMoneyTruncate(amount)
+        amount
       });
     }
     creditors[ci].amount -= amount;
     debtors[di].amount -= amount;
-    if (creditors[ci].amount < 0.01) ci++;
-    if (debtors[di].amount < 0.01) di++;
+    if (creditors[ci].amount <= 0) ci++;
+    if (debtors[di].amount <= 0) di++;
   }
 
   return settlements;
 }
 
 /**
- * Mutates `splits` so quantized values sum to zero by moving the residual onto `paidBy`
- * (sheet import and UI split math share this rounding rule).
+ * Mutates `splits` (integer cents) so values sum to zero by moving any residual onto `paidBy`.
  */
 export function absorbSplitSumIntoPayer(
   splits: Record<string, number>,
   paidBy: string
 ): void {
   if (!paidBy) return;
-  const sum = quantizeMoneyTruncate(
-    Object.values(splits).reduce((a, b) => a + b, 0)
-  );
+  const sum = Object.values(splits).reduce((a, b) => a + b, 0);
   if (sum !== 0) {
-    splits[paidBy] = quantizeMoneyTruncate((splits[paidBy] ?? 0) - sum);
+    splits[paidBy] = (splits[paidBy] ?? 0) - sum;
   }
 }
 
 export function calculateSplits(
-  cost: number,
+  cost: number, // cents
   paidBy: string,
   members: string[],
   splitType: 'equal' | 'exact' | 'percentage' | 'shares',
-  splitValues: Record<string, number>,
+  splitValues: Record<string, number>, // cents for exact, basis-points for percentage, shares for shares
   involvedMembers?: string[]
 ): Record<string, number> {
   const involved = involvedMembers ?? members;
@@ -91,31 +83,61 @@ export function calculateSplits(
 
   for (const m of members) splits[m] = 0;
 
-  const shares: Record<string, number> = {};
+  const owedCents: Record<string, number> = {};
 
   switch (splitType) {
     case 'equal': {
-      const perPerson = cost / involved.length;
-      for (const m of involved) shares[m] = perPerson;
+      const n = Math.max(1, involved.length);
+      const base = Math.trunc(cost / n);
+      let rem = cost - base * n;
+      for (const m of involved) {
+        const add = rem > 0 ? 1 : 0;
+        owedCents[m] = base + add;
+        if (rem > 0) rem--;
+      }
       break;
     }
     case 'exact': {
-      for (const m of involved) shares[m] = splitValues[m] ?? 0;
+      for (const m of involved) owedCents[m] = Math.trunc(splitValues[m] ?? 0);
       break;
     }
     case 'percentage': {
-      for (const m of involved)
-        shares[m] = (cost * (splitValues[m] ?? 0)) / 100;
+      // splitValues are basis points (percent * 100). e.g. 12.34% => 1234.
+      let sum = 0;
+      const order = [...involved];
+      for (const m of order) {
+        const bps = Math.trunc(splitValues[m] ?? 0);
+        const share = Math.trunc((cost * bps) / 10000);
+        owedCents[m] = share;
+        sum += share;
+      }
+      let rem = cost - sum;
+      for (const m of order) {
+        if (rem <= 0) break;
+        owedCents[m] = (owedCents[m] ?? 0) + 1;
+        rem--;
+      }
       break;
     }
     case 'shares': {
-      const totalShares = involved.reduce(
+      const order = [...involved];
+      const totalShares = order.reduce(
         (sum, m) => sum + (splitValues[m] ?? 0),
         0
       );
-      if (totalShares > 0) {
-        for (const m of involved)
-          shares[m] = (cost * (splitValues[m] ?? 0)) / totalShares;
+      if (totalShares <= 0) break;
+      let sum = 0;
+      for (const m of order) {
+        const sh = Math.trunc(splitValues[m] ?? 0);
+        const share = Math.trunc((cost * sh) / totalShares);
+        owedCents[m] = share;
+        sum += share;
+      }
+      let rem = cost - sum;
+      for (const m of order) {
+        if (rem <= 0) break;
+        owedCents[m] = (owedCents[m] ?? 0) + 1;
+        rem--;
       }
       break;
     }
@@ -123,8 +145,8 @@ export function calculateSplits(
 
   for (const m of members) {
     const paid = m === paidBy ? cost : 0;
-    const owes = shares[m] ?? 0;
-    splits[m] = quantizeMoneyTruncate(paid - owes);
+    const owes = owedCents[m] ?? 0;
+    splits[m] = paid - owes;
   }
 
   absorbSplitSumIntoPayer(splits, paidBy);
@@ -132,7 +154,7 @@ export function calculateSplits(
   return splits;
 }
 
-const SPLIT_SHARE_THRESHOLD = 0.001;
+const SPLIT_SHARE_THRESHOLD_CENTS = 1;
 
 /**
  * From persisted per-member net splits, recover who had a positive share of the bill
@@ -153,9 +175,9 @@ export function inferSplitParticipantsFromExpense(
   for (const m of memberOrder) {
     const net = expense.splits[m] ?? 0;
     const owed = m === paidBy ? cost - net : -net;
-    if (owed > SPLIT_SHARE_THRESHOLD) {
+    if (owed >= SPLIT_SHARE_THRESHOLD_CENTS) {
       involved.push(m);
-      owedByMember[m] = quantizeMoneyTruncate(owed);
+      owedByMember[m] = Math.trunc(owed);
     }
   }
 
