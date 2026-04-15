@@ -61,6 +61,23 @@ export function simplifyDebts(
   return settlements;
 }
 
+/**
+ * Mutates `splits` so quantized values sum to zero by moving the residual onto `paidBy`
+ * (sheet import and UI split math share this rounding rule).
+ */
+export function absorbSplitSumIntoPayer(
+  splits: Record<string, number>,
+  paidBy: string
+): void {
+  if (!paidBy) return;
+  const sum = quantizeMoneyTruncate(
+    Object.values(splits).reduce((a, b) => a + b, 0)
+  );
+  if (sum !== 0) {
+    splits[paidBy] = quantizeMoneyTruncate((splits[paidBy] ?? 0) - sum);
+  }
+}
+
 export function calculateSplits(
   cost: number,
   paidBy: string,
@@ -110,13 +127,7 @@ export function calculateSplits(
     splits[m] = quantizeMoneyTruncate(paid - owes);
   }
 
-  // Force splits to sum to exactly zero — absorb any rounding into payer
-  const sum = quantizeMoneyTruncate(
-    Object.values(splits).reduce((a, b) => a + b, 0)
-  );
-  if (sum !== 0) {
-    splits[paidBy] = quantizeMoneyTruncate(splits[paidBy] - sum);
-  }
+  absorbSplitSumIntoPayer(splits, paidBy);
 
   return splits;
 }

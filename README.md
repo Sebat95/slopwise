@@ -1,6 +1,6 @@
-# Slopwise — Expense tracking Clone Powered by Google Sheets
+# Slopwise
 
-A fully functional, mobile-first PWA for splitting expenses with friends. All data is stored in your own Google Sheets. Server-side session management with encrypted cookies and a Google API proxy for seamless, persistent authentication.
+Mobile-first PWA for splitting expenses; **data lives in your Google Sheets**. Express handles sessions, encrypts refresh tokens in Firestore, and proxies Google APIs.
 
 > [!IMPORTANT]
 > I have always wanted to try "vibecoding" an app from scratch, so here I am! I used Cursor to test several competing models:
@@ -23,195 +23,41 @@ A fully functional, mobile-first PWA for splitting expenses with friends. All da
 
 ## Features
 
-- **Expense Tracking** — Add, edit, and delete expenses with descriptions, categories, amounts, and dates
-- **Flexible Splitting** — Split equally, by exact amounts, by percentage, or by shares; last split type and payer remembered
-- **Balance Calculation** — Real-time net balances for each member with simplified debt optimization and zero-sum rounding correction
-- **Settle Up** — Record payments between members with smart prefill and swap
-- **Spending Chart** — Interactive spending-over-time chart with per-member colored lines and a draggable date range brush
-- **Stats Page** — Date-range filtered totals, per-person breakdown, net balances, simplified debts
-- **Google Sheets Backend** — All data stored in your Google Sheets, accessible and editable directly
-- **CSV Interop** — Import CSV exports from competitors and export in the same format
-- **PWA** — Installable on mobile and desktop with persistent sessions
-- **Sheet Picker** — Choose any spreadsheet from your Google Drive or create a new one
-- **Multiple Groups** — Each spreadsheet is a group; switch between them freely
-- **Member Profiles** — Link Google accounts to members for profile pictures; stored in a `_members` sheet tab
-- **Persistent Auth** — Server-side session cookies + encrypted refresh tokens in Firestore; sign in once, stay logged in across app restarts
+Splits (equal, exact, %, shares), balances and simplified debts, settle-up, spending chart and stats, CSV import/export, multi-group via spreadsheets, PWA, Google sign-in with persistent server sessions.
 
-## Tech Stack
+## Stack
 
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4
-- **Auth**: Firebase Authentication (custom tokens) + Google Identity Services (auth code flow)
-- **Server**: Express 5 (Node.js) — serves frontend, manages sessions, proxies Google APIs
-- **Session Management**: HTTP-only encrypted session cookies, Firebase Admin SDK for token verification
-- **Token Storage**: Firestore with AES-256-GCM encrypted Google refresh tokens
-- **APIs**: Google Sheets API v4, Google Drive API v3 (proxied through server)
-- **PWA**: vite-plugin-pwa (Workbox)
-- **Deployment**: Docker (multi-stage), Cloud Run (single container), Cloud Build
+React 19, TypeScript, Vite, Tailwind v4, Firebase Auth + Admin, Google Identity Services (code flow), Express 5, Sheets + Drive APIs (server proxy), Workbox PWA. Deployed as one Docker image on Cloud Run (see `Dockerfile`, `cloudbuild.yaml`).
 
-## Architecture
+**Runtime shape:** browser → Vite dev server or static `dist/` → `/api/*` on Express (8080) → Firestore (encrypted tokens) + Google Sheets (expenses). In production the same container serves the SPA and API.
 
-```
-┌──────────────────────────────────────────────────┐
-│               Cloud Run Container                │
-│                                                  │
-│  ┌─────────────────────────────────────────────┐ │
-│  │  Express Server (server/index.js)           │ │
-│  │                                             │ │
-│  │  POST /api/exchangeCode                     │ │
-│  │    → Google auth code → access + refresh    │ │
-│  │    → Encrypt & store refresh in Firestore   │ │
-│  │    → Return Firebase custom token           │ │
-│  │                                             │ │
-│  │  POST /api/sessionLogin                     │ │
-│  │    → Firebase ID token → session cookie     │ │
-│  │                                             │ │
-│  │  GET  /api/session                          │ │
-│  │    → Verify session cookie → user info      │ │
-│  │                                             │ │
-│  │  POST /api/sessionLogout                    │ │
-│  │    → Clear session cookie                   │ │
-│  │                                             │ │
-│  │  POST /api/googleProxy                      │ │
-│  │    → Verify session → refresh access token  │ │
-│  │    → Proxy request to Google APIs           │ │
-│  │    → Allowlisted targets only               │ │
-│  │                                             │ │
-│  │  GET  /*  → Static frontend (SPA)           │ │
-│  └─────────────────────────────────────────────┘ │
-│                                                  │
-│  ┌─────────────────────────────────────────────┐ │
-│  │  Static Frontend (dist/)                    │ │
-│  │  React PWA                                  │ │
-│  └─────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────┘
-         │                        │
-         ▼                        ▼
-   ┌───────────┐          ┌──────────────┐
-   │ Firestore │          │ Google Sheets│
-   │ (encrypted│          │ (user data)  │
-   │  tokens)  │          │              │
-   └───────────┘          └──────────────┘
-```
+**Security (summary):** encrypted refresh tokens, HTTP-only session cookies, allowlisted proxy targets, rate limits on sensitive routes, hardened headers and CSP in production.
 
-## Security
+## Local setup
 
-- Google refresh tokens are encrypted with AES-256-GCM before storage in Firestore
-- Session cookies are HTTP-only, Secure, SameSite=Lax (or `__Host-` prefixed in production)
-- Google API requests are proxied server-side through an allowlisted target list (only Sheets and Drive endpoints)
-- Rate limiting on auth and proxy endpoints
-- Non-root container user in production Docker image
-- HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy headers
-- CSP configured for Google OAuth, Sheets API, and Firebase domains
-
-## Getting Started
-
-### 1. Clone and install
+1. **Firebase / GCP (same project):** enable Auth (Google), create Firestore, add a Web app and copy `firebaseConfig`. In Google Cloud: enable Sheets + Drive APIs, create an **OAuth Web client**, copy Client ID and secret.
+2. **OAuth client:** under **Authorized JavaScript origins**, add `http://localhost:5173` and your production origin when you have one. Redirect URIs are usually unnecessary for this GIS popup + `postmessage` flow unless the console asks for them.
+3. **Env:** `cp .env.example .env` and fill values (see `.env.example`). Use the **same** OAuth client ID for `VITE_GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_ID`. Vite loads `VITE_*` from the repo root `.env`; the **server does not read `.env`**—export `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `TOKEN_ENCRYPTION_KEY` in the server shell or pass them inline below.
+4. **Firebase Admin locally:** run `gcloud auth application-default login` (user with Firestore access) or set `GOOGLE_APPLICATION_CREDENTIALS` to a service account JSON. Server needs **Node ≥ 22** (`server/package.json` `engines`).
 
 ```bash
-git clone <repo-url>
-cd slopwise
-corepack enable
-yarn install
+corepack enable && yarn install
+yarn dev   # app http://localhost:5173 — proxies /api to http://localhost:8080
 ```
-
-### 2. Set up Firebase & Google Cloud
-
-1. Go to [Firebase Console](https://console.firebase.google.com/) and create a new project
-2. Go to **Authentication → Sign-in method** and enable **Google**
-3. Go to **Project Settings → General**, add a Web App, and copy the `firebaseConfig` object
-4. Go to **Firestore Database → Create database** (production mode, choose your region)
-5. Go to [Google Cloud Console](https://console.cloud.google.com/) for the same project
-6. Enable the **Google Sheets API** and **Google Drive API**
-7. Go to **APIs & Services → Credentials** and note the **OAuth Client ID** and **Client Secret**
-8. Under **Authorized JavaScript origins**, add your app URL and `http://localhost:5173`
-9. Under **Authorized redirect URIs**, add your app URL
-10. Go to **OAuth consent screen**, configure it, and add test users if in testing mode
-
-### 3. Configure Environment Variables
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```env
-# Build-time (baked into frontend by Vite)
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-
-# Build-time + runtime (Dockerfile aliases to VITE_GOOGLE_CLIENT_ID for Vite)
-GOOGLE_CLIENT_ID=your_oauth_client_id
-
-# Runtime only (server)
-GOOGLE_CLIENT_SECRET=your_oauth_client_secret
-
-# Base64-encoded 32-byte key for encrypting refresh tokens
-# Generate with: openssl rand -base64 32
-TOKEN_ENCRYPTION_KEY=your_base64_key
-```
-
-### 4. Run locally
-
-Frontend:
-
-```bash
-yarn dev
-```
-
-Server (in a separate terminal):
 
 ```bash
 cd server && npm install
-GOOGLE_CLIENT_ID=xxx GOOGLE_CLIENT_SECRET=xxx TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32) node index.js
+GOOGLE_CLIENT_ID=xxx GOOGLE_CLIENT_SECRET=xxx TOKEN_ENCRYPTION_KEY="$(openssl rand -base64 32)" node index.js
 ```
 
-### 5. Deploy to Cloud Run
+**Docker / Cloud Build:** the `GOOGLE_CLIENT_ID` secret is passed as the `VITE_GOOGLE_CLIENT_ID` build arg at image build; runtime secrets are wired in `cloudbuild.yaml` (Firebase `VITE_*`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` in Secret Manager).
 
-The project includes a `Dockerfile` and `cloudbuild.yaml` for automated deployment via Cloud Build.
+## Development
 
-**Secrets needed in GCP Secret Manager:**
+`yarn format` · `yarn lint` · `yarn tsc --noEmit` · `yarn test` (unit + e2e; e2e starts `yarn dev`) · `yarn test:unit` · `yarn test:e2e` · `yarn build`
 
-| Secret                              | Used at         | Description                      |
-| ----------------------------------- | --------------- | -------------------------------- |
-| `VITE_FIREBASE_API_KEY`             | Build           | Firebase config                  |
-| `VITE_FIREBASE_AUTH_DOMAIN`         | Build           | Firebase config                  |
-| `VITE_FIREBASE_PROJECT_ID`          | Build           | Firebase config                  |
-| `VITE_FIREBASE_STORAGE_BUCKET`      | Build           | Firebase config                  |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Build           | Firebase config                  |
-| `VITE_FIREBASE_APP_ID`              | Build           | Firebase config                  |
-| `GOOGLE_CLIENT_ID`                  | Build + Runtime | OAuth Client ID                  |
-| `GOOGLE_CLIENT_SECRET`              | Runtime         | OAuth Client Secret              |
-| `TOKEN_ENCRYPTION_KEY`              | Runtime         | AES-256 key for token encryption |
+Contributor-oriented detail: [CLAUDE.md](CLAUDE.md).
 
-The `cloudbuild.yaml` handles passing build args and mounting runtime secrets on Cloud Run automatically.
+## Sheet layout
 
-## Google Sheets Data Format
-
-The app stores data in competitors-compatible CSV format:
-
-| Date       | Description | Category   | Cost  | Currency | Alice  | Bob    | Charlie |
-| ---------- | ----------- | ---------- | ----- | -------- | ------ | ------ | ------- |
-| 2024-01-15 | Dinner      | Dining out | 60.00 | EUR      | 40.00  | -20.00 | -20.00  |
-| 2024-01-16 | Taxi        | Transport  | 30.00 | EUR      | -15.00 | 15.00  | 0.00    |
-
-Each member column shows their **net** for that expense:
-
-- **Positive** = they are owed money (paid more than their share)
-- **Negative** = they owe money
-- **Zero** = not involved or fully settled
-
-Additional sheet tabs:
-
-- **`_settings`** — currency, last split type, last payer
-- **`_members`** — member name, linked email, profile photo URL
-
-## Categories
-
-20 simplified categories that map from all competitors subcategories:
-
-General, Groceries, Dining out, Drinks, Rent, Utilities, Household, Transport, Travel, Entertainment, Shopping, Healthcare, Education, Gifts, Insurance, Taxes, Sports, Pets, Services, Payment
+Tabular expenses: **Date, Description, Category, Cost, Currency**, then one column per member (**net** per row: positive = owed, negative = owes). Meta tabs **`_settings`** (defaults) and **`_members`** (names, linked email, photo URL). Twenty normalized categories (`CATEGORIES` in [src/types/index.ts](src/types/index.ts)) for CSV interop with tools like Splitwise.

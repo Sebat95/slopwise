@@ -206,16 +206,6 @@ export function formatCurrency(
   return amount < 0 ? `-${symbol}${formatted}` : `${symbol}${formatted}`;
 }
 
-export function formatDate(dateStr: string): string {
-  try {
-    const date = parseISO(dateStr);
-    if (!isValid(date)) return dateStr;
-    return format(date, 'MMM d, yyyy');
-  } catch {
-    return dateStr;
-  }
-}
-
 export function formatDateShort(dateStr: string): string {
   try {
     const date = parseISO(dateStr);

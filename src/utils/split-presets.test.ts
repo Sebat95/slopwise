@@ -1,9 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import {
+  emptySplitValuePresets,
   equalSplitRememberPreset,
   getPresetInvolvedMembers,
   getPresetValuesFromStorage
 } from './split-presets';
+
+describe('emptySplitValuePresets', () => {
+  it('returns empty maps for every split type', () => {
+    const p = emptySplitValuePresets();
+    expect(p.equal).toEqual({});
+    expect(p.exact).toEqual({});
+    expect(p.percentage).toEqual({});
+    expect(p.shares).toEqual({});
+  });
+
+  it('returns a fresh object each call', () => {
+    const a = emptySplitValuePresets();
+    const b = emptySplitValuePresets();
+    expect(a).not.toBe(b);
+    expect(a.equal).not.toBe(b.equal);
+  });
+});
 
 describe('equalSplitRememberPreset + getPresetInvolvedMembers', () => {
   const allMembers = ['Alice', 'Bob', 'Carol', 'Dave'];

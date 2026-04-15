@@ -6,10 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "yarn test:unit && yarn test:e2e",
     "test:unit": "vitest run",
-    "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "test": "yarn test:unit && yarn test:e2e",
+    "test:interactive": "vitest --ui",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write './**/*.{js,jsx,ts,tsx,css,md,json,html}' --config ./.prettierrc"
@@ -35,6 +35,7 @@
     "@types/react-dom": "19.2.3",
     "@types/uuid": "11.0.0",
     "@vitejs/plugin-react": "5.1.1",
+    "@vitest/ui": "4.1.1",
     "eslint": "9.39.1",
     "eslint-plugin-react-hooks": "7.0.1",
     "eslint-plugin-react-refresh": "0.4.24",

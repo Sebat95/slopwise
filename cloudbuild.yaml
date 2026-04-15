@@ -21,6 +21,32 @@ availableSecrets:
       env: GOOGLE_CLIENT_ID
 
 steps:
+  # Unit + e2e tests before image build; failures stop the pipeline.
+  - id: test
+    name: mcr.microsoft.com/playwright:v1.58.2-jammy
+    entrypoint: bash
+    env:
+      - CI=true
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        npm install -g corepack@latest
+        corepack enable
+        corepack prepare yarn@4.12.0 --activate
+        export VITE_GOOGLE_CLIENT_ID="$$GOOGLE_CLIENT_ID"
+        yarn install --immutable
+        yarn test
+    secretEnv:
+      - VITE_FIREBASE_API_KEY
+      - VITE_FIREBASE_AUTH_DOMAIN
+      - VITE_FIREBASE_PROJECT_ID
+      - VITE_FIREBASE_STORAGE_BUCKET
+      - VITE_FIREBASE_MESSAGING_SENDER_ID
+      - VITE_FIREBASE_APP_ID
+      - GOOGLE_CLIENT_ID
+    timeout: 1200s
+
   - name: gcr.io/cloud-builders/docker
     entrypoint: bash
     args:

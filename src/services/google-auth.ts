@@ -6,7 +6,7 @@ import { auth } from './firebase';
 import type { GoogleUserProfile } from '../types';
 
 const API_BASE = '/api';
-export const AUTH_EXPIRED_EVENT = 'slopwise:auth-expired';
+const AUTH_EXPIRED_EVENT = 'slopwise:auth-expired';
 
 interface SessionResponse {
   authenticated: boolean;

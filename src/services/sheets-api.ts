@@ -14,6 +14,8 @@ import {
   quantizeMoneyTruncate
 } from '../utils/format';
 import { v4 as uuidv4 } from 'uuid';
+import { absorbSplitSumIntoPayer } from '../utils/balance';
+import { emptySplitValuePresets } from '../utils/split-presets';
 
 const API_BASE = '/api';
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -26,10 +28,6 @@ interface ExpenseMetaRow {
   signature: string;
   paidBy: string;
   splitType: SplitType;
-}
-
-function emptySplitValuePresets(): SplitValuePresets {
-  return { equal: {}, exact: {}, percentage: {}, shares: {} };
 }
 
 function isSplitType(value: string | undefined): value is SplitType {
@@ -421,13 +419,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
         : inferredPaidBy;
     const splitType = matchingMeta?.splitType || 'equal';
 
-    // Force splits to sum to exactly zero — absorb any imbalance into payer
-    const splitSum = quantizeMoneyTruncate(
-      Object.values(splits).reduce((a, b) => a + b, 0)
-    );
-    if (paidBy && splitSum !== 0) {
-      splits[paidBy] = quantizeMoneyTruncate(splits[paidBy] - splitSum);
-    }
+    absorbSplitSumIntoPayer(splits, paidBy);
 
     const cost = parseSheetMoney(row[3] || '0');
     const category = normalizeCategory(row[2] || 'General');

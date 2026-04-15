@@ -8,7 +8,7 @@ import {
 import ModalFrame from '../components/ModalFrame';
 import { X } from 'lucide-react';
 
-export type ConfirmOptions = {
+type ConfirmOptions = {
   title: string;
   message: string;
   confirmLabel?: string;

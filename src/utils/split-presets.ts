@@ -1,3 +1,10 @@
+import type { SplitValuePresets } from '../types';
+
+/** Fresh preset map for all split types (used for defaults and renames). */
+export function emptySplitValuePresets(): SplitValuePresets {
+  return { equal: {}, exact: {}, percentage: {}, shares: {} };
+}
+
 /** Values from sheet/settings for one split type, keyed by member name. */
 export function getPresetValuesFromStorage(
   presetForType: Record<string, number> | undefined,

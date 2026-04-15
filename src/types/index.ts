@@ -35,14 +35,6 @@ export interface SheetData {
   lastSplitValuePresets: SplitValuePresets;
 }
 
-export interface GoogleTokenInfo {
-  access_token: string;
-  expires_in: number;
-  token_type: string;
-  scope: string;
-  expiry_time: number;
-}
-
 export interface MemberInfo {
   name: string;
   email: string;

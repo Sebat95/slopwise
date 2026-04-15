@@ -16,6 +16,7 @@ import type {
 } from '../types';
 import * as sheetsApi from '../services/sheets-api';
 import { fetchUserProfile } from '../services/google-auth';
+import { emptySplitValuePresets } from '../utils/split-presets';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AppState {
@@ -68,10 +69,6 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 function getSsId(): string | null {
   return localStorage.getItem('slopwise_spreadsheet_id');
-}
-
-function emptySplitValuePresets(): SplitValuePresets {
-  return { equal: {}, exact: {}, percentage: {}, shares: {} };
 }
 
 function renameSplitPresetMember(
