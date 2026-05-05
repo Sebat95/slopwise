@@ -6,6 +6,7 @@ import {
   useEffect,
   type ReactNode
 } from 'react';
+import type { GoogleUserProfile } from '../types';
 import {
   signIn,
   signOut as authSignOut,
@@ -17,6 +18,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  user: GoogleUserProfile | null;
 }
 
 interface AuthContextValue extends AuthState {
@@ -30,7 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     isAuthenticated: false,
     isLoading: true,
-    error: null
+    error: null,
+    user: null
   });
 
   useEffect(() => {
@@ -43,11 +46,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState({
           isAuthenticated: session.authenticated,
           isLoading: false,
-          error: null
+          error: null,
+          user: session.user
         });
       } catch {
         if (cancelled) return;
-        setState({ isAuthenticated: false, isLoading: false, error: null });
+        setState({
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          user: null
+        });
       }
     })();
 
@@ -58,7 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     return onSessionExpired(() => {
-      setState({ isAuthenticated: false, isLoading: false, error: null });
+      setState({
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+        user: null
+      });
     });
   }, []);
 
@@ -70,19 +84,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!session.authenticated) {
         throw new Error('Secure session was not established');
       }
-      setState({ isAuthenticated: true, isLoading: false, error: null });
+      setState({
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        user: session.user
+      });
     } catch (err) {
       setState({
         isAuthenticated: false,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Sign-in failed'
+        error: err instanceof Error ? err.message : 'Sign-in failed',
+        user: null
       });
     }
   }, []);
 
   const logout = useCallback(async () => {
     await authSignOut();
-    setState({ isAuthenticated: false, isLoading: false, error: null });
+    setState({
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+      user: null
+    });
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
   }, []);

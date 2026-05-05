@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import Layout from '../components/Layout';
 import ExpenseCard from '../components/ExpenseCard';
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const {
     spreadsheetName,
     members,
+    memberProfiles,
     expenses,
     currency,
     isLoading,
@@ -40,6 +42,7 @@ export default function DashboardPage() {
     renameSheet,
     settleUp
   } = useApp();
+  const { user } = useAuth();
   const confirm = useConfirm();
 
   const [editing, setEditing] = useState(false);
@@ -83,6 +86,15 @@ export default function DashboardPage() {
   const allRecent = useMemo(() => [...expenses].reverse(), [expenses]);
   const recentExpenses = allRecent.slice(0, visibleCount);
   const hasMore = visibleCount < allRecent.length;
+
+  const currentMemberName = useMemo(() => {
+    const email = user?.email?.trim();
+    if (!email) return null;
+    return (
+      members.find((m) => (memberProfiles[m]?.email || '').trim() === email) ??
+      null
+    );
+  }, [members, memberProfiles, user?.email]);
 
   const getOwedAmount = (from: string, to: string): number => {
     const debt = debts.find((d) => d.from === from && d.to === to);
@@ -242,7 +254,18 @@ export default function DashboardPage() {
                         </span>
                       </div>
                     </div>
-                    <span className="text-negative text-sm font-bold">
+                    <span
+                      className={[
+                        'text-sm font-bold',
+                        currentMemberName
+                          ? d.from === currentMemberName
+                            ? 'text-negative'
+                            : d.to === currentMemberName
+                              ? 'text-positive'
+                              : 'text-text-muted'
+                          : 'text-negative'
+                      ].join(' ')}
+                    >
                       {formatCurrency(d.amount, currency)}
                     </span>
                   </div>
