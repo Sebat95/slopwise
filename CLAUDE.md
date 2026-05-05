@@ -87,7 +87,7 @@ Runtime (server only): `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` (base64 32
 - Always pull before anything
 - Afterwards run format
 - Write comments and/or documentation on complex functions or pieces of code
-- Check your results with lint and tests (fix until both are fine)
+- Check your results with lint, tests and build (fix them until they are fine)
 - Never commit or push if you are on main
 
 ## Protected files
