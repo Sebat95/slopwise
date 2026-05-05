@@ -91,6 +91,24 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shouldRetryReadError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes('failed to fetch') ||
+    m.includes('networkerror') ||
+    m.includes('load failed') ||
+    m.includes('timeout') ||
+    // common proxy/cold-start transient failures
+    m.includes('api error: 502') ||
+    m.includes('api error: 503') ||
+    m.includes('api error: 504')
+  );
+}
+
 function buildProfileMap(
   members: string[],
   profiles: MemberInfo[]
@@ -196,24 +214,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const requestId = beginReadRequest();
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
-      const { data, profileMap } = await readSpreadsheetSnapshot(ssId);
-      if (!isActiveReadRequest(requestId)) return;
-      hydratedSpreadsheetIdRef.current = ssId;
+      const retryDelaysMs = [250, 750, 1500];
+      let lastErr: unknown = null;
 
-      setState((s) => ({
-        ...s,
-        spreadsheetId: ssId,
-        members: data.members,
-        memberProfiles: profileMap,
-        expenses: data.expenses,
-        currency: data.currency,
-        lastSplitType: data.lastSplitType,
-        lastPaidBy: data.lastPaidBy,
-        lastSplitValuePresets: data.lastSplitValuePresets,
-        isLoading: false,
-        error: null,
-        lastSync: new Date()
-      }));
+      for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+        try {
+          const { data, profileMap } = await readSpreadsheetSnapshot(ssId);
+          if (!isActiveReadRequest(requestId)) return;
+          hydratedSpreadsheetIdRef.current = ssId;
+
+          setState((s) => ({
+            ...s,
+            spreadsheetId: ssId,
+            members: data.members,
+            memberProfiles: profileMap,
+            expenses: data.expenses,
+            currency: data.currency,
+            lastSplitType: data.lastSplitType,
+            lastPaidBy: data.lastPaidBy,
+            lastSplitValuePresets: data.lastSplitValuePresets,
+            isLoading: false,
+            error: null,
+            lastSync: new Date()
+          }));
+          return;
+        } catch (err) {
+          lastErr = err;
+          const message = getErrorMessage(err, 'Failed to load data');
+          const canRetry =
+            attempt < retryDelaysMs.length && shouldRetryReadError(message);
+          if (!canRetry) break;
+          await sleep(retryDelaysMs[attempt]);
+        }
+      }
+
+      throw lastErr instanceof Error
+        ? lastErr
+        : new Error(getErrorMessage(lastErr, 'Failed to load data'));
+      if (!isActiveReadRequest(requestId)) return;
     } catch (err) {
       if (!isActiveReadRequest(requestId)) return;
       setState((s) => ({
@@ -231,6 +269,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (hydratedSpreadsheetIdRef.current === ssId) return;
+    // Prevent repeated auto-load loops on persistent failures; transient failures
+    // are handled by the retry logic inside loadData().
     hydratedSpreadsheetIdRef.current = ssId;
     void loadData();
   }, [loadData, state.spreadsheetId]);

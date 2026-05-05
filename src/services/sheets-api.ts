@@ -67,8 +67,8 @@ function buildExpenseSignatureFromExpense(
 ): string {
   return buildExpenseSignature(
     expense.date,
-    expense.description,
-    expense.category,
+    (expense.description || '').trim(),
+    normalizeCategory(expense.category || 'General'),
     expense.cost,
     expense.currency,
     members.map((member) => expense.splits[member] ?? 0)
@@ -82,8 +82,8 @@ function buildExpenseSignatureFromRow(
 ): string {
   return buildExpenseSignature(
     row[0] || '',
-    row[1] || '',
-    row[2] || 'General',
+    (row[1] || '').trim(),
+    normalizeCategory(row[2] || 'General'),
     parseSheetMoneyCents(row[3] || '0'),
     row[4] || fallbackCurrency,
     memberColumns.map((memberColumn) =>
@@ -424,7 +424,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     expenses.push({
       id: uuidv4(),
       date: row[0],
-      description: row[1] || '',
+      description: (row[1] || '').trim(),
       category,
       cost,
       currency: expCurrency,
