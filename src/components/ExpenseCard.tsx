@@ -24,19 +24,6 @@ export default function ExpenseCard({
   const isSettlement = expense.category === 'Payment';
   const isClickable = !!onEdit;
 
-  const userSplit =
-    currentUser !== undefined && currentUser !== ''
-      ? expense.splits[currentUser]
-      : undefined;
-  const amountToneClass =
-    userSplit === undefined
-      ? 'text-text-primary'
-      : userSplit > 0
-        ? 'text-positive'
-        : userSplit < 0
-          ? 'text-negative'
-          : 'text-text-muted';
-
   return (
     <div
       className={`bg-bg-card border-border/50 group flex items-center gap-3 rounded-xl border p-3 transition-colors ${
@@ -64,7 +51,7 @@ export default function ExpenseCard({
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className={`font-semibold ${amountToneClass}`}>
+        <div className="text-text-primary font-semibold">
           {formatCurrency(expense.cost, expense.currency)}
         </div>
         {currentUser && expense.splits[currentUser] !== undefined && (
