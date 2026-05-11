@@ -16,6 +16,7 @@ import type {
 } from '../types';
 import * as sheetsApi from '../services/sheets-api';
 import { fetchUserProfile } from '../services/google-auth';
+import { useAuth } from './AuthContext';
 import { emptySplitValuePresets } from '../utils/split-presets';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -123,6 +124,9 @@ function buildProfileMap(
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  const prevAuthenticatedRef = useRef<boolean | null>(null);
+
   const [state, setState] = useState<AppState>({
     spreadsheetId: getSsId(),
     spreadsheetName: localStorage.getItem('slopwise_spreadsheet_name'),
@@ -251,7 +255,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       throw lastErr instanceof Error
         ? lastErr
         : new Error(getErrorMessage(lastErr, 'Failed to load data'));
-      if (!isActiveReadRequest(requestId)) return;
     } catch (err) {
       if (!isActiveReadRequest(requestId)) return;
       setState((s) => ({
@@ -262,18 +265,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [beginReadRequest, isActiveReadRequest, readSpreadsheetSnapshot]);
 
+  const disconnect = useCallback(() => {
+    beginReadRequest();
+    hydratedSpreadsheetIdRef.current = null;
+    localStorage.removeItem('slopwise_spreadsheet_id');
+    localStorage.removeItem('slopwise_spreadsheet_name');
+    setState((s) => ({
+      ...s,
+      spreadsheetId: null,
+      spreadsheetName: null,
+      members: [],
+      memberProfiles: {},
+      expenses: [],
+      lastSplitType: 'equal',
+      lastPaidBy: '',
+      lastSplitValuePresets: emptySplitValuePresets(),
+      error: null
+    }));
+  }, [beginReadRequest]);
+
   useEffect(() => {
+    const prev = prevAuthenticatedRef.current;
+    prevAuthenticatedRef.current = isAuthenticated;
+    if (prev === true && !isAuthenticated) {
+      disconnect();
+    }
+  }, [isAuthenticated, disconnect]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      hydratedSpreadsheetIdRef.current = null;
+      return;
+    }
     const ssId = state.spreadsheetId;
     if (!ssId) {
       hydratedSpreadsheetIdRef.current = null;
       return;
     }
     if (hydratedSpreadsheetIdRef.current === ssId) return;
-    // Prevent repeated auto-load loops on persistent failures; transient failures
-    // are handled by the retry logic inside loadData().
-    hydratedSpreadsheetIdRef.current = ssId;
     void loadData();
-  }, [loadData, state.spreadsheetId]);
+  }, [loadData, state.spreadsheetId, isAuthenticated]);
 
   const addExpense = useCallback(async (expense: Omit<Expense, 'id'>) => {
     const ssId = getSsId();
@@ -763,25 +794,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     []
   );
-
-  const disconnect = useCallback(() => {
-    beginReadRequest();
-    hydratedSpreadsheetIdRef.current = null;
-    localStorage.removeItem('slopwise_spreadsheet_id');
-    localStorage.removeItem('slopwise_spreadsheet_name');
-    setState((s) => ({
-      ...s,
-      spreadsheetId: null,
-      spreadsheetName: null,
-      members: [],
-      memberProfiles: {},
-      expenses: [],
-      lastSplitType: 'equal',
-      lastPaidBy: '',
-      lastSplitValuePresets: emptySplitValuePresets(),
-      error: null
-    }));
-  }, [beginReadRequest]);
 
   const actions = useMemo<AppActions>(
     () => ({

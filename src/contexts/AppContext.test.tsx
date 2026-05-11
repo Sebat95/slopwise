@@ -1,7 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { AppProvider, useApp } from './AppContext';
-import type { SheetData } from '../types';
+import type { GoogleUserProfile, SheetData } from '../types';
+
+const mockUseAuth = vi.fn();
+
+vi.mock('./AuthContext', () => ({
+  useAuth: () => mockUseAuth()
+}));
+
+function authValue(overrides?: { isAuthenticated?: boolean }) {
+  return {
+    isAuthenticated: true,
+    isLoading: false,
+    error: null,
+    user: null as GoogleUserProfile | null,
+    login: vi.fn(),
+    logout: vi.fn(),
+    ...overrides
+  };
+}
 
 vi.mock('../services/sheets-api', () => {
   return {
@@ -60,12 +78,14 @@ async function flushAll(): Promise<void> {
 
 describe('AppProvider initial load retries', () => {
   beforeEach(() => {
+    mockUseAuth.mockReturnValue(authValue());
     vi.useFakeTimers();
     localStorage.setItem('slopwise_spreadsheet_id', 'sheet123');
     localStorage.setItem('slopwise_spreadsheet_name', 'Test Sheet');
   });
 
   afterEach(() => {
+    mockUseAuth.mockReturnValue(authValue());
     vi.useRealTimers();
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
@@ -127,5 +147,69 @@ describe('AppProvider initial load retries', () => {
     expect(readSheetDataMock.mock.calls.length).toBe(callsAfterInitial);
     expect(screen.getByTestId('expenses-count')).toHaveTextContent('0');
     expect(screen.getByTestId('error').textContent || '').not.toBe('');
+  });
+
+  it('does not fetch sheet data until the user is authenticated', async () => {
+    mockUseAuth.mockReturnValue(authValue({ isAuthenticated: false }));
+    const readSheetDataMock = vi.mocked(sheetsApi.readSheetData);
+    const readMemberProfilesMock = vi.mocked(sheetsApi.readMemberProfiles);
+    readMemberProfilesMock.mockResolvedValue([]);
+    readSheetDataMock.mockResolvedValue(makeSheetData());
+    readSheetDataMock.mockClear();
+
+    const { rerender } = render(
+      <AppProvider>
+        <TestConsumer />
+      </AppProvider>
+    );
+    await flushAll();
+    expect(readSheetDataMock).not.toHaveBeenCalled();
+
+    mockUseAuth.mockReturnValue(authValue({ isAuthenticated: true }));
+    rerender(
+      <AppProvider>
+        <TestConsumer />
+      </AppProvider>
+    );
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+
+    expect(readSheetDataMock).toHaveBeenCalled();
+    expect(screen.getByTestId('expenses-count')).toHaveTextContent('1');
+  });
+
+  it('clears spreadsheet selection when auth becomes false (logout / session end)', async () => {
+    const readSheetDataMock = vi.mocked(sheetsApi.readSheetData);
+    const readMemberProfilesMock = vi.mocked(sheetsApi.readMemberProfiles);
+    readMemberProfilesMock.mockResolvedValue([]);
+    readSheetDataMock.mockResolvedValue(makeSheetData());
+    readSheetDataMock.mockClear();
+
+    const { rerender } = render(
+      <AppProvider>
+        <TestConsumer />
+      </AppProvider>
+    );
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('expenses-count')).toHaveTextContent('1');
+    expect(localStorage.getItem('slopwise_spreadsheet_id')).toBe('sheet123');
+
+    mockUseAuth.mockReturnValue(authValue({ isAuthenticated: false }));
+    rerender(
+      <AppProvider>
+        <TestConsumer />
+      </AppProvider>
+    );
+    await flushAll();
+
+    expect(localStorage.getItem('slopwise_spreadsheet_id')).toBeNull();
+    expect(screen.getByTestId('expenses-count')).toHaveTextContent('0');
+    expect(readSheetDataMock.mock.calls.length).toBe(1);
   });
 });
