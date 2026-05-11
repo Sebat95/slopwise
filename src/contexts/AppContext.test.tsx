@@ -129,4 +129,3 @@ describe('AppProvider initial load retries', () => {
     expect(screen.getByTestId('error').textContent || '').not.toBe('');
   });
 });
-

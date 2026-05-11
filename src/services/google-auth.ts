@@ -2,7 +2,7 @@ import {
   signInWithCustomToken,
   signOut as firebaseSignOut
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, authPersistenceReady } from './firebase';
 import type { GoogleUserProfile } from '../types';
 
 const API_BASE = '/api';
@@ -116,6 +116,30 @@ export function onSessionExpired(listener: () => void): () => void {
   return () => window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
 }
 
+/**
+ * Mint a new HTTP-only session cookie from the current Firebase ID token.
+ * Used after Google sign-in and on debounced token refresh for sliding sessions.
+ */
+export async function renewServerSession(): Promise<void> {
+  await authPersistenceReady;
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const idToken = await user.getIdToken();
+  const sessionRes = await fetch(`${API_BASE}/sessionLogin`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken })
+  });
+
+  if (!sessionRes.ok) {
+    throw new Error(
+      await readApiError(sessionRes, 'Could not refresh secure session')
+    );
+  }
+}
+
 export async function signIn(): Promise<void> {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) throw new Error('Missing VITE_GOOGLE_CLIENT_ID');
@@ -137,26 +161,12 @@ export async function signIn(): Promise<void> {
   const data = (await res.json()) as ExchangeCodeResponse;
 
   try {
+    await authPersistenceReady;
     await signInWithCustomToken(auth, data.firebase_token);
-    const idToken = await auth.currentUser?.getIdToken();
-    if (!idToken) {
-      throw new Error('Could not establish a secure session');
-    }
-
-    const sessionRes = await fetch(`${API_BASE}/sessionLogin`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken })
-    });
-
-    if (!sessionRes.ok) {
-      throw new Error(
-        await readApiError(sessionRes, 'Could not establish a secure session')
-      );
-    }
-  } finally {
+    await renewServerSession();
+  } catch (err) {
     await firebaseSignOut(auth).catch(() => {});
+    throw err instanceof Error ? err : new Error('Sign-in failed');
   }
 }
 
@@ -186,5 +196,4 @@ export async function signOut(): Promise<void> {
     credentials: 'include'
   }).catch(() => {});
   await firebaseSignOut(auth);
-  notifySessionExpired();
 }

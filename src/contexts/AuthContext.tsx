@@ -6,13 +6,18 @@ import {
   useEffect,
   type ReactNode
 } from 'react';
+import { onIdTokenChanged } from 'firebase/auth';
 import type { GoogleUserProfile } from '../types';
+import { auth, authPersistenceReady } from '../services/firebase';
 import {
   signIn,
   signOut as authSignOut,
   getSession,
-  onSessionExpired
+  onSessionExpired,
+  renewServerSession
 } from '../services/google-auth';
+
+const SESSION_RENEW_DEBOUNCE_MS = 60_000;
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -75,6 +80,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     });
   }, []);
+
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+    let unsubscribeIdToken: (() => void) | undefined;
+
+    const scheduleRenew = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (cancelled) return;
+        void renewServerSession().catch(() => {});
+      }, SESSION_RENEW_DEBOUNCE_MS);
+    };
+
+    void (async () => {
+      await authPersistenceReady;
+      if (cancelled) return;
+      unsubscribeIdToken = onIdTokenChanged(auth, (user) => {
+        if (cancelled || !user) return;
+        scheduleRenew();
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(debounceTimer);
+      unsubscribeIdToken?.();
+    };
+  }, [state.isAuthenticated]);
 
   const login = useCallback(async () => {
     setState((s) => ({ ...s, isLoading: true, error: null }));

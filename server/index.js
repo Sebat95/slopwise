@@ -10,7 +10,7 @@ import { OAuth2Client } from 'google-auth-library';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = path.join(__dirname, 'public');
 const PORT = parseInt(process.env.PORT || '8080', 10);
-const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 5;
+const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 14;
 const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === 'production'
     ? '__Host-slopwise_session'

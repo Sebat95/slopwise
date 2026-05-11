@@ -1,5 +1,9 @@
 import { initializeApp } from 'firebase/app';
-import { inMemoryPersistence, getAuth, setPersistence } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  getAuth,
+  setPersistence
+} from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,4 +16,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-void setPersistence(auth, inMemoryPersistence).catch(() => {});
+
+/** Await before sign-in / session renewal so persistence is applied reliably. */
+export const authPersistenceReady = setPersistence(
+  auth,
+  browserLocalPersistence
+).catch(() => {});
