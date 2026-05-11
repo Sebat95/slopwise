@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import Layout from '../components/Layout';
 import ExpenseCard from '../components/ExpenseCard';
@@ -12,8 +13,25 @@ import { getCategoryEmoji, formatCurrency } from '../utils/format';
 
 export default function ExpensesPage() {
   const navigate = useNavigate();
-  const { expenses, currency, isLoading, deleteExpense } = useApp();
+  const {
+    expenses,
+    currency,
+    isLoading,
+    deleteExpense,
+    members,
+    memberProfiles
+  } = useApp();
+  const { user } = useAuth();
   const confirm = useConfirm();
+
+  const currentMemberName = useMemo(() => {
+    const email = user?.email?.trim();
+    if (!email) return null;
+    return (
+      members.find((m) => (memberProfiles[m]?.email || '').trim() === email) ??
+      null
+    );
+  }, [members, memberProfiles, user?.email]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -165,6 +183,7 @@ export default function ExpensesPage() {
                     <ExpenseCard
                       key={e.id}
                       expense={e}
+                      currentUser={currentMemberName ?? undefined}
                       showDate={false}
                       onEdit={handleEdit}
                       onDelete={handleDelete}

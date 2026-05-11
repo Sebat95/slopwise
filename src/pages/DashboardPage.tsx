@@ -327,6 +327,7 @@ export default function DashboardPage() {
                 <ExpenseCard
                   key={e.id}
                   expense={e}
+                  currentUser={currentMemberName ?? undefined}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                 />
