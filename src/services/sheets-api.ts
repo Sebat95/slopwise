@@ -20,6 +20,14 @@ const MAX_ROWS = 10000;
 const SPLIT_TYPES: SplitType[] = ['equal', 'exact', 'percentage', 'shares'];
 const EXPENSE_META_SHEET = '_expense_meta';
 
+/** Skip getSpreadsheetInfo in ensureExpenseMetaSheet after first success per id until invalidated. */
+const expenseMetaSheetReady = new Set<string>();
+
+export function invalidateExpenseMetaSheetCache(spreadsheetId?: string): void {
+  if (spreadsheetId === undefined) expenseMetaSheetReady.clear();
+  else expenseMetaSheetReady.delete(spreadsheetId);
+}
+
 interface ExpenseMetaRow {
   signature: string;
   paidBy: string;
@@ -554,6 +562,42 @@ export async function updateExpenseRow(
   );
 }
 
+function expenseToMetaValueRow(expense: Expense, members: string[]): string[] {
+  return [
+    buildExpenseSignatureFromExpense(expense, members),
+    expense.paidBy,
+    expense.splitType
+  ];
+}
+
+export async function appendExpenseMetadataRow(
+  spreadsheetId: string,
+  expense: Expense,
+  members: string[]
+): Promise<void> {
+  await ensureExpenseMetaSheet(spreadsheetId);
+  const row = expenseToMetaValueRow(expense, members);
+  await apiRequest<unknown>(
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    { method: 'POST', body: JSON.stringify({ values: [row] }) }
+  );
+}
+
+export async function updateExpenseMetadataRow(
+  spreadsheetId: string,
+  rowIndex: number,
+  expense: Expense,
+  members: string[]
+): Promise<void> {
+  await ensureExpenseMetaSheet(spreadsheetId);
+  const rowNum = rowIndex + 2;
+  const row = expenseToMetaValueRow(expense, members);
+  await apiRequest<unknown>(
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A${rowNum}:C${rowNum}?valueInputOption=USER_ENTERED`,
+    { method: 'PUT', body: JSON.stringify({ values: [row] }) }
+  );
+}
+
 export async function deleteExpenseRow(
   spreadsheetId: string,
   rowIndex: number
@@ -567,22 +611,48 @@ export async function deleteExpenseRow(
   );
   if (!expensesSheet) throw new Error('Expenses sheet not found');
 
+  const metaSheet = sheetInfo.sheets.find(
+    (s) => s.properties.title === EXPENSE_META_SHEET
+  );
+
+  const requests: Array<{
+    deleteDimension: {
+      range: {
+        sheetId: number;
+        dimension: 'ROWS';
+        startIndex: number;
+        endIndex: number;
+      };
+    };
+  }> = [
+    {
+      deleteDimension: {
+        range: {
+          sheetId: expensesSheet.properties.sheetId,
+          dimension: 'ROWS',
+          startIndex: rowIndex + 1,
+          endIndex: rowIndex + 2
+        }
+      }
+    }
+  ];
+
+  if (metaSheet) {
+    requests.push({
+      deleteDimension: {
+        range: {
+          sheetId: metaSheet.properties.sheetId,
+          dimension: 'ROWS',
+          startIndex: rowIndex + 1,
+          endIndex: rowIndex + 2
+        }
+      }
+    });
+  }
+
   await apiRequest<unknown>(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
     method: 'POST',
-    body: JSON.stringify({
-      requests: [
-        {
-          deleteDimension: {
-            range: {
-              sheetId: expensesSheet.properties.sheetId,
-              dimension: 'ROWS',
-              startIndex: rowIndex + 1,
-              endIndex: rowIndex + 2
-            }
-          }
-        }
-      ]
-    })
+    body: JSON.stringify({ requests })
   });
 }
 
@@ -600,6 +670,8 @@ export async function readMemberProfiles(
 }
 
 async function ensureExpenseMetaSheet(spreadsheetId: string): Promise<void> {
+  if (expenseMetaSheetReady.has(spreadsheetId)) return;
+
   const info = await getSpreadsheetInfo(spreadsheetId);
   if (!info.sheets.includes(EXPENSE_META_SHEET)) {
     await apiRequest<unknown>(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
@@ -616,6 +688,7 @@ async function ensureExpenseMetaSheet(spreadsheetId: string): Promise<void> {
       }
     );
   }
+  expenseMetaSheetReady.add(spreadsheetId);
 }
 
 async function readExpenseMetadata(

@@ -24,7 +24,8 @@ function authValue(overrides?: { isAuthenticated?: boolean }) {
 vi.mock('../services/sheets-api', () => {
   return {
     readSheetData: vi.fn(),
-    readMemberProfiles: vi.fn()
+    readMemberProfiles: vi.fn(),
+    invalidateExpenseMetaSheetCache: vi.fn()
   };
 });
 

@@ -172,6 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const connectSpreadsheet = useCallback(
     async (id: string, name: string) => {
       beginReadRequest();
+      sheetsApi.invalidateExpenseMetaSheetCache(id);
       setState((s) => ({ ...s, isLoading: true, error: null }));
       try {
         const { data, profileMap } = await readSpreadsheetSnapshot(id);
@@ -215,6 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadData = useCallback(async () => {
     const ssId = stateRef.current.spreadsheetId || getSsId();
     if (!ssId) return;
+    sheetsApi.invalidateExpenseMetaSheetCache(ssId);
     const requestId = beginReadRequest();
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
@@ -267,6 +269,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const disconnect = useCallback(() => {
     beginReadRequest();
+    sheetsApi.invalidateExpenseMetaSheetCache();
     hydratedSpreadsheetIdRef.current = null;
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
@@ -312,7 +315,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const current = stateRef.current;
     const newExpense: Expense = { ...expense, id: uuidv4() };
-    const nextExpenses = [...current.expenses, newExpense];
     setState((s) => ({
       ...s,
       expenses: [...s.expenses, newExpense],
@@ -322,9 +324,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       await sheetsApi.appendExpense(ssId, newExpense, current.members);
-      await sheetsApi.writeAllExpenseMetadata(
+      await sheetsApi.appendExpenseMetadataRow(
         ssId,
-        nextExpenses,
+        newExpense,
         current.members
       );
       setState((s) => ({ ...s, isSyncing: false, error: null }));
@@ -351,9 +353,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const updatedExpense: Expense = { ...updated, id: expenseId };
       const backup = [...current.expenses];
-      const nextExpenses = current.expenses.map((expense) =>
-        expense.id === expenseId ? updatedExpense : expense
-      );
 
       setState((s) => ({
         ...s,
@@ -371,9 +370,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           updatedExpense,
           current.members
         );
-        await sheetsApi.writeAllExpenseMetadata(
+        await sheetsApi.updateExpenseMetadataRow(
           ssId,
-          nextExpenses,
+          idx,
+          updatedExpense,
           current.members
         );
         setState((s) => ({ ...s, isSyncing: false, error: null }));
@@ -400,9 +400,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (idx < 0) throw new Error('Expense not found');
 
     const backup = [...current.expenses];
-    const nextExpenses = current.expenses.filter(
-      (expense) => expense.id !== expenseId
-    );
     setState((s) => ({
       ...s,
       expenses: s.expenses.filter((e) => e.id !== expenseId),
@@ -412,11 +409,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       await sheetsApi.deleteExpenseRow(ssId, idx);
-      await sheetsApi.writeAllExpenseMetadata(
-        ssId,
-        nextExpenses,
-        current.members
-      );
       setState((s) => ({ ...s, isSyncing: false, error: null }));
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to delete expense');
@@ -645,7 +637,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         splitType: 'exact',
         splits
       };
-      const nextExpenses = [...current.expenses, settlement];
 
       setState((s) => ({
         ...s,
@@ -656,9 +647,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       try {
         await sheetsApi.appendExpense(ssId, settlement, current.members);
-        await sheetsApi.writeAllExpenseMetadata(
+        await sheetsApi.appendExpenseMetadataRow(
           ssId,
-          nextExpenses,
+          settlement,
           current.members
         );
         setState((s) => ({ ...s, isSyncing: false, error: null }));

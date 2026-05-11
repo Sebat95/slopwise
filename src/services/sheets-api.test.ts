@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { readSheetData } from './sheets-api';
+import {
+  readSheetData,
+  deleteExpenseRow,
+  appendExpenseMetadataRow,
+  updateExpenseMetadataRow,
+  invalidateExpenseMetaSheetCache
+} from './sheets-api';
 import { normalizeCategory } from '../utils/format';
+import type { Expense } from '../types';
 
 function makeGoogleProxyResponse(payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -106,5 +113,211 @@ describe('readSheetData payer metadata matching', () => {
     expect(data.members).toEqual(members);
     expect(data.expenses).toHaveLength(1);
     expect(data.expenses[0].paidBy).toBe('A');
+  });
+});
+
+describe('incremental _expense_meta writes', () => {
+  const spreadsheetId = 'metaSheet456';
+
+  const sampleExpense: Expense = {
+    id: 'e1',
+    date: '2026-06-01',
+    description: 'Lunch',
+    category: 'General',
+    cost: 500,
+    currency: 'EUR',
+    paidBy: 'A',
+    splitType: 'equal',
+    splits: { A: 250, B: 250 }
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+    invalidateExpenseMetaSheetCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    invalidateExpenseMetaSheetCache();
+  });
+
+  it('deleteExpenseRow batchUpdate deletes Expenses and _expense_meta rows together', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(
+      async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const bodyRaw = typeof init?.body === 'string' ? init.body : '';
+        const body = bodyRaw ? (JSON.parse(bodyRaw) as { url?: string }) : {};
+        const target = body.url || '';
+
+        if (target.includes(`:batchUpdate`)) {
+          return makeGoogleProxyResponse({});
+        }
+
+        if (target.includes('?fields=sheets.properties')) {
+          return makeGoogleProxyResponse({
+            sheets: [
+              { properties: { sheetId: 111, title: 'Expenses' } },
+              { properties: { sheetId: 222, title: '_expense_meta' } }
+            ]
+          });
+        }
+
+        throw new Error(`Unexpected proxy URL in test: ${target}`);
+      }
+    );
+
+    await deleteExpenseRow(spreadsheetId, 2);
+
+    const batchCall = fetchMock.mock.calls.find((c) => {
+      const init = c[1] as RequestInit | undefined;
+      const raw = typeof init?.body === 'string' ? init.body : '';
+      const b = raw ? (JSON.parse(raw) as { url?: string }) : {};
+      return Boolean(b.url?.includes(':batchUpdate'));
+    });
+    expect(batchCall).toBeDefined();
+
+    const parsed = JSON.parse(
+      (batchCall![1] as RequestInit).body as string
+    ) as {
+      url: string;
+      body: string | null;
+    };
+    const batchBody = JSON.parse(parsed.body || '{}') as {
+      requests: Array<{ deleteDimension: { range: { sheetId: number } } }>;
+    };
+    expect(batchBody.requests).toHaveLength(2);
+    expect(batchBody.requests[0].deleteDimension.range.sheetId).toBe(111);
+    expect(batchBody.requests[1].deleteDimension.range.sheetId).toBe(222);
+  });
+
+  it('deleteExpenseRow only deletes Expenses when _expense_meta tab is missing', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(
+      async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const bodyRaw = typeof init?.body === 'string' ? init.body : '';
+        const body = bodyRaw ? (JSON.parse(bodyRaw) as { url?: string }) : {};
+        const target = body.url || '';
+
+        if (target.includes(`:batchUpdate`)) {
+          return makeGoogleProxyResponse({});
+        }
+
+        if (target.includes('?fields=sheets.properties')) {
+          return makeGoogleProxyResponse({
+            sheets: [{ properties: { sheetId: 111, title: 'Expenses' } }]
+          });
+        }
+
+        throw new Error(`Unexpected proxy URL in test: ${target}`);
+      }
+    );
+
+    await deleteExpenseRow(spreadsheetId, 0);
+
+    const batchCall = fetchMock.mock.calls.find((c) => {
+      const init = c[1] as RequestInit | undefined;
+      const raw = typeof init?.body === 'string' ? init.body : '';
+      const b = raw ? (JSON.parse(raw) as { url?: string }) : {};
+      return Boolean(b.url?.includes(':batchUpdate'));
+    });
+    expect(batchCall).toBeDefined();
+    const outer = JSON.parse((batchCall![1] as RequestInit).body as string) as {
+      url: string;
+      body: string | null;
+    };
+    const batchBody = JSON.parse(outer.body || '{}') as {
+      requests: unknown[];
+    };
+    expect(batchBody.requests).toHaveLength(1);
+  });
+
+  it('appendExpenseMetadataRow ensures sheet then appends one meta row', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(
+      async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const bodyRaw = typeof init?.body === 'string' ? init.body : '';
+        const body = bodyRaw ? (JSON.parse(bodyRaw) as { url?: string }) : {};
+        const target = body.url || '';
+
+        if (
+          target.includes('?fields=properties.title,sheets.properties.title')
+        ) {
+          return makeGoogleProxyResponse({
+            properties: { title: 'T' },
+            sheets: [
+              { properties: { title: 'Expenses' } },
+              { properties: { title: '_expense_meta' } }
+            ]
+          });
+        }
+
+        if (target.includes('_expense_meta!A1:append')) {
+          return makeGoogleProxyResponse({});
+        }
+
+        throw new Error(`Unexpected proxy URL in test: ${target}`);
+      }
+    );
+
+    await appendExpenseMetadataRow(spreadsheetId, sampleExpense, ['A', 'B']);
+
+    const targets = fetchMock.mock.calls
+      .map((c) => {
+        const init = c[1] as RequestInit | undefined;
+        const raw = typeof init?.body === 'string' ? init.body : '';
+        return raw ? (JSON.parse(raw) as { url?: string }).url || '' : '';
+      })
+      .filter(Boolean);
+
+    expect(
+      targets.some((u) =>
+        u.includes('?fields=properties.title,sheets.properties.title')
+      )
+    ).toBe(true);
+    expect(targets.some((u) => u.includes('_expense_meta!A1:append'))).toBe(
+      true
+    );
+  });
+
+  it('updateExpenseMetadataRow writes a single _expense_meta row range', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(
+      async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const bodyRaw = typeof init?.body === 'string' ? init.body : '';
+        const body = bodyRaw ? (JSON.parse(bodyRaw) as { url?: string }) : {};
+        const target = body.url || '';
+
+        if (
+          target.includes('?fields=properties.title,sheets.properties.title')
+        ) {
+          return makeGoogleProxyResponse({
+            properties: { title: 'T' },
+            sheets: [
+              { properties: { title: 'Expenses' } },
+              { properties: { title: '_expense_meta' } }
+            ]
+          });
+        }
+
+        if (target.includes('_expense_meta!A5:C5')) {
+          return makeGoogleProxyResponse({});
+        }
+
+        throw new Error(`Unexpected proxy URL in test: ${target}`);
+      }
+    );
+
+    await updateExpenseMetadataRow(spreadsheetId, 3, sampleExpense, ['A', 'B']);
+
+    const targets = fetchMock.mock.calls
+      .map((c) => {
+        const init = c[1] as RequestInit | undefined;
+        const raw = typeof init?.body === 'string' ? init.body : '';
+        return raw ? (JSON.parse(raw) as { url?: string }).url || '' : '';
+      })
+      .filter(Boolean);
+
+    expect(targets.some((u) => u.includes('_expense_meta!A5:C5'))).toBe(true);
   });
 });

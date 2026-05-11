@@ -93,9 +93,9 @@ steps:
       - --platform=managed
       - --allow-unauthenticated
       - --port=8080
-      - --memory=512Mi
+      - --memory=256Mi
       - --min-instances=0
-      - --max-instances=3
+      - --max-instances=2
       - --set-env-vars=NODE_ENV=production
       - --update-secrets=GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,TOKEN_ENCRYPTION_KEY=TOKEN_ENCRYPTION_KEY:latest
       - --quiet
