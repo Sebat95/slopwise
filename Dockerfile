@@ -16,17 +16,18 @@ ARG VITE_GOOGLE_CLIENT_ID
 RUN test -n "$VITE_FIREBASE_CONFIG" && \
     test -n "$VITE_GOOGLE_CLIENT_ID"
 
-ENV VITE_FIREBASE_CONFIG=$VITE_FIREBASE_CONFIG
-ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
-
 # copy stuff to build
 COPY package.json yarn.lock .yarnrc.yml ./
 RUN yarn install --immutable
 
 COPY . .
 
-# build frontend
-RUN yarn build
+# build frontend (inline env: JSON in ARG breaks Dockerfile ENV parsing)
+ARG VITE_FIREBASE_CONFIG
+ARG VITE_GOOGLE_CLIENT_ID
+RUN VITE_FIREBASE_CONFIG="$VITE_FIREBASE_CONFIG" \
+    VITE_GOOGLE_CLIENT_ID="$VITE_GOOGLE_CLIENT_ID" \
+    yarn build
 
 ### FE/MAIN-APP: Serve Stage
 FROM node:25-alpine AS runtime

@@ -38,10 +38,10 @@ steps:
       - -c
       - |
         docker build --pull \
-          --build-arg VITE_FIREBASE_CONFIG=$$VITE_FIREBASE_CONFIG \
-          --build-arg VITE_GOOGLE_CLIENT_ID=$$GOOGLE_CLIENT_ID \
-          -t ${_IMAGE}:$SHORT_SHA \
-          -t ${_IMAGE}:latest \
+          --build-arg "VITE_FIREBASE_CONFIG=$$VITE_FIREBASE_CONFIG" \
+          --build-arg "VITE_GOOGLE_CLIENT_ID=$$GOOGLE_CLIENT_ID" \
+          -t "${_IMAGE}:$SHORT_SHA" \
+          -t "${_IMAGE}:latest" \
           .
     secretEnv:
       - VITE_FIREBASE_CONFIG
