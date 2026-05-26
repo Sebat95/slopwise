@@ -12,6 +12,7 @@ import { normalizeCategory, parseSheetMoneyCents } from '../utils/format';
 import { v4 as uuidv4 } from 'uuid';
 import { absorbSplitSumIntoPayer } from '../utils/balance';
 import { emptySplitValuePresets } from '../utils/split-presets';
+import { parseShareInputs, serializeShareInputs } from '../utils/share-input';
 
 const API_BASE = '/api';
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -32,6 +33,7 @@ interface ExpenseMetaRow {
   signature: string;
   paidBy: string;
   splitType: SplitType;
+  shareInputs?: Record<string, number>;
 }
 
 function isSplitType(value: string | undefined): value is SplitType {
@@ -438,7 +440,8 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
       currency: expCurrency,
       paidBy,
       splitType,
-      splits
+      splits,
+      shareInputs: matchingMeta?.shareInputs
     });
   }
   return {
@@ -566,7 +569,10 @@ function expenseToMetaValueRow(expense: Expense, members: string[]): string[] {
   return [
     buildExpenseSignatureFromExpense(expense, members),
     expense.paidBy,
-    expense.splitType
+    expense.splitType,
+    serializeShareInputs(
+      expense.splitType === 'shares' ? expense.shareInputs : undefined
+    )
   ];
 }
 
@@ -593,7 +599,7 @@ export async function updateExpenseMetadataRow(
   const rowNum = rowIndex + 2;
   const row = expenseToMetaValueRow(expense, members);
   await apiRequest<unknown>(
-    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A${rowNum}:C${rowNum}?valueInputOption=USER_ENTERED`,
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A${rowNum}:D${rowNum}?valueInputOption=USER_ENTERED`,
     { method: 'PUT', body: JSON.stringify({ values: [row] }) }
   );
 }
@@ -681,10 +687,12 @@ async function ensureExpenseMetaSheet(spreadsheetId: string): Promise<void> {
       })
     });
     await apiRequest<unknown>(
-      `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A1:C1?valueInputOption=USER_ENTERED`,
+      `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A1:D1?valueInputOption=USER_ENTERED`,
       {
         method: 'PUT',
-        body: JSON.stringify({ values: [['Signature', 'PaidBy', 'SplitType']] })
+        body: JSON.stringify({
+          values: [['Signature', 'PaidBy', 'SplitType', 'ShareInputs']]
+        })
       }
     );
   }
@@ -695,7 +703,7 @@ async function readExpenseMetadata(
   spreadsheetId: string
 ): Promise<ExpenseMetaRow[]> {
   const data = await apiRequest<{ values?: string[][] }>(
-    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A2:C${MAX_ROWS}`
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A2:D${MAX_ROWS}`
   ).catch(() => ({ values: undefined }));
 
   if (!data.values) return [];
@@ -706,7 +714,12 @@ async function readExpenseMetadata(
     const paidBy = row[1]?.trim() || '';
     const splitType = row[2]?.trim();
     if (!signature || !isSplitType(splitType)) continue;
-    metadata.push({ signature, paidBy, splitType });
+    metadata.push({
+      signature,
+      paidBy,
+      splitType,
+      shareInputs: parseShareInputs(row[3])
+    });
   }
 
   return metadata;
@@ -719,20 +732,16 @@ export async function writeAllExpenseMetadata(
 ): Promise<void> {
   await ensureExpenseMetaSheet(spreadsheetId);
   const rows = [
-    ['Signature', 'PaidBy', 'SplitType'],
-    ...expenses.map((expense) => [
-      buildExpenseSignatureFromExpense(expense, members),
-      expense.paidBy,
-      expense.splitType
-    ])
+    ['Signature', 'PaidBy', 'SplitType', 'ShareInputs'],
+    ...expenses.map((expense) => expenseToMetaValueRow(expense, members))
   ];
 
   await apiRequest<unknown>(
-    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A1:C${rows.length}?valueInputOption=USER_ENTERED`,
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A1:D${rows.length}?valueInputOption=USER_ENTERED`,
     { method: 'PUT', body: JSON.stringify({ values: rows }) }
   );
   await apiRequest<unknown>(
-    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A${rows.length + 1}:C${MAX_ROWS}:clear`,
+    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A${rows.length + 1}:D${MAX_ROWS}:clear`,
     { method: 'POST', body: JSON.stringify({}) }
   ).catch(() => {});
 }

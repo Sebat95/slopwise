@@ -114,6 +114,87 @@ describe('readSheetData payer metadata matching', () => {
     expect(data.expenses).toHaveLength(1);
     expect(data.expenses[0].paidBy).toBe('A');
   });
+
+  it('loads shareInputs from _expense_meta column D for shares expenses', async () => {
+    const members = ['A', 'B', 'C'];
+    const rowDate = '2026-05-10';
+    const rowDescription = 'Pizza';
+    const rowCategory = 'General';
+    const rowCostCents = 30000;
+    const rowCurrency = 'USD';
+    const rowSplits = { A: 30000, B: -1667, C: -28333 };
+    const shareInputsJson = JSON.stringify({ B: 1, C: 17 });
+
+    const signature = JSON.stringify({
+      date: rowDate,
+      description: rowDescription,
+      category: rowCategory,
+      costCents: rowCostCents,
+      currency: rowCurrency,
+      splitsCents: members.map((m) => rowSplits[m as keyof typeof rowSplits])
+    });
+
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(
+      async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const bodyRaw = typeof init?.body === 'string' ? init.body : '';
+        const body = bodyRaw ? (JSON.parse(bodyRaw) as { url?: string }) : {};
+        const target = body.url || '';
+
+        if (
+          target.includes(`/spreadsheets/${spreadsheetId}/values/Expenses!`)
+        ) {
+          return makeGoogleProxyResponse({
+            values: [
+              [
+                'Date',
+                'Description',
+                'Category',
+                'Cost',
+                'Currency',
+                ...members
+              ],
+              [
+                rowDate,
+                rowDescription,
+                rowCategory,
+                String(rowCostCents),
+                rowCurrency,
+                String(rowSplits.A),
+                String(rowSplits.B),
+                String(rowSplits.C)
+              ]
+            ]
+          });
+        }
+
+        if (
+          target.includes(`/spreadsheets/${spreadsheetId}/values/_settings!`)
+        ) {
+          return makeGoogleProxyResponse({
+            values: [['Currency', rowCurrency]]
+          });
+        }
+
+        if (
+          target.includes(
+            `/spreadsheets/${spreadsheetId}/values/_expense_meta!`
+          )
+        ) {
+          return makeGoogleProxyResponse({
+            values: [[signature, 'A', 'shares', shareInputsJson]]
+          });
+        }
+
+        throw new Error(`Unexpected proxy URL in test: ${target}`);
+      }
+    );
+
+    const data = await readSheetData(spreadsheetId);
+    expect(data.expenses).toHaveLength(1);
+    expect(data.expenses[0].splitType).toBe('shares');
+    expect(data.expenses[0].shareInputs).toEqual({ B: 1, C: 17 });
+  });
 });
 
 describe('incremental _expense_meta writes', () => {
@@ -300,7 +381,7 @@ describe('incremental _expense_meta writes', () => {
           });
         }
 
-        if (target.includes('_expense_meta!A5:C5')) {
+        if (target.includes('_expense_meta!A5:D5')) {
           return makeGoogleProxyResponse({});
         }
 
@@ -318,6 +399,6 @@ describe('incremental _expense_meta writes', () => {
       })
       .filter(Boolean);
 
-    expect(targets.some((u) => u.includes('_expense_meta!A5:C5'))).toBe(true);
+    expect(targets.some((u) => u.includes('_expense_meta!A5:D5'))).toBe(true);
   });
 });

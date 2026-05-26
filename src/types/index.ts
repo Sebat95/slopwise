@@ -11,6 +11,8 @@ export interface Expense {
   paidBy: string;
   splitType: SplitType;
   splits: Record<string, number>;
+  /** User-entered share counts (e.g. 1, 17, 12.22); persisted in _expense_meta. */
+  shareInputs?: Record<string, number>;
   notes?: string;
 }
 

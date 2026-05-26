@@ -147,21 +147,6 @@ export function formatMoneyInputFromNumber(n: number): string {
   return String(q);
 }
 
-/** Non-negative integer share counts for the shares split UI. */
-export function sanitizeShareInput(raw: string): string {
-  const t = String(raw).trim();
-  if (!t) return '';
-  const m = t.match(/^\d+/);
-  return m ? m[0] : '';
-}
-
-export function parseShareCount(input: string): number {
-  const digits = sanitizeShareInput(input);
-  if (!digits) return 0;
-  const n = Number.parseInt(digits, 10);
-  return Number.isFinite(n) && n >= 0 ? n : 0;
-}
-
 /** Canonical text for hydrating a money input from integer cents (`.` decimal). */
 export function formatMoneyInputFromCents(cents: number): string {
   if (!Number.isFinite(cents) || cents === 0) return '';

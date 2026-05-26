@@ -75,7 +75,7 @@ export function calculateSplits(
   paidBy: string,
   members: string[],
   splitType: 'equal' | 'exact' | 'percentage' | 'shares',
-  splitValues: Record<string, number>, // cents for exact, basis-points for percentage, shares for shares
+  splitValues: Record<string, number>, // cents for exact; basis-points for %; hundredths-of-share for shares
   involvedMembers?: string[]
 ): Record<string, number> {
   const involved = involvedMembers ?? members;

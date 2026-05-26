@@ -20,11 +20,15 @@ import {
   formatCurrency,
   getCategoryEmoji,
   parseMoneyCents,
-  parseShareCount,
   sanitizeMoneyInput,
-  sanitizeShareInput,
   formatMoneyInputFromCents
 } from '../utils/format';
+import {
+  formatShareInputFromAmount,
+  parseShareInputToHundredths,
+  sanitizeShareInput,
+  shareHundredthsToAmount
+} from '../utils/share-input';
 import {
   ChevronLeft,
   Check,
@@ -114,7 +118,7 @@ export default function AddExpensePage() {
         Object.fromEntries(
           Object.entries(shares).map(([k, v]) => [
             k,
-            v > 0 ? String(Math.trunc(v)) : ''
+            v > 0 ? formatShareInputFromAmount(v) : ''
           ])
         )
       );
@@ -141,7 +145,12 @@ export default function AddExpensePage() {
     if (!isEdit) {
       const nextInvolved = getPresetInvolved(type);
       setInvolved(nextInvolved);
-      setSplitStateFromNumbers(buildSplitValues(type, nextInvolved));
+      const built = buildSplitValues(type, nextInvolved);
+      if (type === 'shares') {
+        setSplitStateFromShares(built);
+      } else {
+        setSplitStateFromNumbers(built);
+      }
     }
   };
   const splitValues = useMemo(() => {
@@ -149,7 +158,9 @@ export default function AddExpensePage() {
     for (const m of members) {
       const raw = splitRaw[m] ?? '';
       out[m] =
-        splitType === 'shares' ? parseShareCount(raw) : parseMoneyCents(raw);
+        splitType === 'shares'
+          ? parseShareInputToHundredths(raw)
+          : parseMoneyCents(raw);
     }
     return out;
   }, [splitRaw, members, splitType]);
@@ -167,7 +178,12 @@ export default function AddExpensePage() {
     setSplitTypeLocal(nextSplitType);
     const nextInvolved = getPresetInvolved(nextSplitType);
     setInvolved(nextInvolved);
-    setSplitStateFromNumbers(buildSplitValues(nextSplitType, nextInvolved));
+    const built = buildSplitValues(nextSplitType, nextInvolved);
+    if (nextSplitType === 'shares') {
+      setSplitStateFromShares(built);
+    } else {
+      setSplitStateFromNumbers(built);
+    }
   }, [
     buildSplitValues,
     currency,
@@ -175,7 +191,8 @@ export default function AddExpensePage() {
     lastPaidBy,
     lastSplitType,
     members,
-    setSplitStateFromNumbers
+    setSplitStateFromNumbers,
+    setSplitStateFromShares
   ]);
 
   useEffect(() => {
@@ -204,7 +221,11 @@ export default function AddExpensePage() {
       }
       setSplitStateFromNumbers(percentages);
     } else if (expense.splitType === 'shares') {
-      setSplitStateFromShares(inferShareValuesFromExpense(expense, members));
+      const shares =
+        expense.shareInputs && Object.keys(expense.shareInputs).length > 0
+          ? expense.shareInputs
+          : inferShareValuesFromExpense(expense, members);
+      setSplitStateFromShares(shares);
     } else {
       setSplitRaw({});
     }
@@ -328,10 +349,17 @@ export default function AddExpensePage() {
         const rememberedValues =
           splitType === 'equal'
             ? equalSplitRememberPreset(involved)
-            : [...involved].reduce<Record<string, number>>((acc, member) => {
-                acc[member] = splitValues[member] ?? 0;
-                return acc;
-              }, {});
+            : splitType === 'shares'
+              ? Object.fromEntries(
+                  [...involved].map((member) => [
+                    member,
+                    shareHundredthsToAmount(splitValues[member] ?? 0)
+                  ])
+                )
+              : [...involved].reduce<Record<string, number>>((acc, member) => {
+                  acc[member] = splitValues[member] ?? 0;
+                  return acc;
+                }, {});
         setLastSplitValuesForType(splitType, rememberedValues);
       }
       const splits = calculateSplits(
@@ -342,6 +370,15 @@ export default function AddExpensePage() {
         splitValues,
         [...involved]
       );
+      const shareInputs =
+        splitType === 'shares'
+          ? Object.fromEntries(
+              [...involved].map((member) => [
+                member,
+                shareHundredthsToAmount(splitValues[member] ?? 0)
+              ])
+            )
+          : undefined;
       const expenseData = {
         date,
         description: description.trim(),
@@ -350,7 +387,8 @@ export default function AddExpensePage() {
         currency: expCurrency,
         paidBy,
         splitType,
-        splits
+        splits,
+        shareInputs
       };
 
       if (isEdit && editId) {
@@ -584,6 +622,7 @@ export default function AddExpensePage() {
                         <input
                           type="text"
                           inputMode="decimal"
+                          placeholder="0"
                           value={m in splitRaw ? splitRaw[m] : '1'}
                           onChange={(e) =>
                             setSplitRawForMember(m, e.target.value)

@@ -87,7 +87,7 @@ describe('calculateSplits', () => {
       'A',
       members,
       'shares',
-      { B: 1, C: 3 },
+      { B: 100, C: 300 },
       ['B', 'C']
     );
     expect(splits.B).toBe(-25);
@@ -194,14 +194,14 @@ describe('simplifyDebts', () => {
 describe('inferShareValuesFromExpense', () => {
   const members = ['A', 'B', 'C'];
 
-  it('recovers 1:3 share ratio from persisted owed cents (not dollar amounts)', () => {
+  it('legacy infer falls back when shareInputs missing (1:3 on even split)', () => {
     const expense = makeExpense(
       'shares-1-3',
       100,
       'A',
       members,
       'shares',
-      { B: 1, C: 3 },
+      { B: 100, C: 300 },
       ['B', 'C']
     );
     expect(expense.splitType).toBe('shares');
@@ -210,14 +210,28 @@ describe('inferShareValuesFromExpense', () => {
     expect(shares).toEqual({ B: 1, C: 3 });
   });
 
-  it('round-trips through calculateSplits after recovery', () => {
+  it('legacy infer can be wrong after cent rounding (1:17 on $300)', () => {
+    const expense = makeExpense(
+      'shares-1-17',
+      30000,
+      'A',
+      members,
+      'shares',
+      { B: 100, C: 1700 },
+      ['B', 'C']
+    );
+    const shares = inferShareValuesFromExpense(expense, members);
+    expect(shares).toEqual({ B: 1667, C: 28333 });
+  });
+
+  it('round-trips through calculateSplits after legacy recovery', () => {
     const expense = makeExpense(
       'shares-rt',
       100,
       'A',
       members,
       'shares',
-      { B: 1, C: 3 },
+      { B: 100, C: 300 },
       ['B', 'C']
     );
     const recovered = inferShareValuesFromExpense(expense, members);

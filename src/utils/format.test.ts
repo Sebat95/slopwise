@@ -4,11 +4,9 @@ import {
   parseAmount,
   parseSheetMoneyCents,
   parseMoneyCents,
-  parseShareCount,
   quantizeMoneyTruncate,
   isValidMoneyInputString,
-  sanitizeMoneyInput,
-  sanitizeShareInput
+  sanitizeMoneyInput
 } from './format';
 
 describe('format utils', () => {
@@ -73,20 +71,6 @@ describe('format utils', () => {
       expect(parseMoneyCents('5.60')).toBe(560);
       expect(parseMoneyCents('5.699')).toBe(569);
       expect(parseMoneyCents('0.6')).toBe(60);
-    });
-  });
-
-  describe('parseShareCount', () => {
-    it('parses non-negative integer share counts', () => {
-      expect(parseShareCount('3')).toBe(3);
-      expect(parseShareCount('')).toBe(0);
-      expect(parseShareCount('12abc')).toBe(12);
-    });
-
-    it('sanitizeShareInput keeps integer prefix only', () => {
-      expect(sanitizeShareInput('3')).toBe('3');
-      expect(sanitizeShareInput('1.5')).toBe('1');
-      expect(sanitizeShareInput('12abc')).toBe('12');
     });
   });
 
