@@ -75,8 +75,9 @@ export default function LoginPage() {
               </li>
               <li>
                 Create a <code>.env</code> file based on{' '}
-                <code>.env.example</code> and fill in the{' '}
-                <code>VITE_FIREBASE_*</code> variables.
+                <code>.env.example</code> and set{' '}
+                <code>VITE_FIREBASE_CONFIG</code> to a minified JSON object with{' '}
+                <code>VITE_FIREBASE_*</code> keys (one line).
               </li>
               <li>
                 In Google Cloud Console, ensure{' '}

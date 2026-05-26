@@ -72,7 +72,7 @@ Vite proxies `/api/*` → `http://localhost:8080`, so the frontend always hits r
 
 ## Environment Variables
 
-Build-time (Vite, baked into bundle): `VITE_FIREBASE_*`, `VITE_GOOGLE_CLIENT_ID`
+Build-time (Vite, baked into bundle): `VITE_FIREBASE_CONFIG` (minified JSON with `VITE_FIREBASE_*` keys), `VITE_GOOGLE_CLIENT_ID`. GCP: one Secret Manager secret `VITE_FIREBASE_CONFIG`.
 
 Runtime (server only): `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` (base64 32-byte key)
 
