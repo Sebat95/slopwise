@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { CATEGORIES, CURRENCIES, type SplitType } from '../types';
 import {
   calculateSplits,
+  inferShareValuesFromExpense,
   inferSplitParticipantsFromExpense
 } from '../utils/balance';
 import {
@@ -19,7 +20,9 @@ import {
   formatCurrency,
   getCategoryEmoji,
   parseMoneyCents,
+  parseShareCount,
   sanitizeMoneyInput,
+  sanitizeShareInput,
   formatMoneyInputFromCents
 } from '../utils/format';
 import {
@@ -105,6 +108,20 @@ export default function AddExpensePage() {
     []
   );
 
+  const setSplitStateFromShares = useCallback(
+    (shares: Record<string, number>) => {
+      setSplitRaw(
+        Object.fromEntries(
+          Object.entries(shares).map(([k, v]) => [
+            k,
+            v > 0 ? String(Math.trunc(v)) : ''
+          ])
+        )
+      );
+    },
+    []
+  );
+
   const [involved, setInvolved] = useState<Set<string>>(new Set());
 
   const [description, setDescription] = useState('');
@@ -132,9 +149,7 @@ export default function AddExpensePage() {
     for (const m of members) {
       const raw = splitRaw[m] ?? '';
       out[m] =
-        splitType === 'shares'
-          ? Math.trunc(parseMoneyCents(raw) / 100)
-          : parseMoneyCents(raw);
+        splitType === 'shares' ? parseShareCount(raw) : parseMoneyCents(raw);
     }
     return out;
   }, [splitRaw, members, splitType]);
@@ -189,12 +204,12 @@ export default function AddExpensePage() {
       }
       setSplitStateFromNumbers(percentages);
     } else if (expense.splitType === 'shares') {
-      setSplitStateFromNumbers(values);
+      setSplitStateFromShares(inferShareValuesFromExpense(expense, members));
     } else {
       setSplitRaw({});
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [existing, members, setSplitStateFromNumbers]);
+  }, [existing, members, setSplitStateFromNumbers, setSplitStateFromShares]);
 
   useEffect(() => {
     if (isEdit || hasInitializedNewExpense.current || members.length === 0)
@@ -239,7 +254,10 @@ export default function AddExpensePage() {
   const setSplitRawForMember = (member: string, raw: string) => {
     setSplitRaw((prev) => ({
       ...prev,
-      [member]: sanitizeMoneyInput(raw)
+      [member]:
+        splitType === 'shares'
+          ? sanitizeShareInput(raw)
+          : sanitizeMoneyInput(raw)
     }));
   };
 

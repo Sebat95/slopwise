@@ -4,6 +4,7 @@ import {
   absorbSplitSumIntoPayer,
   calculateNetBalances,
   calculateSplits,
+  inferShareValuesFromExpense,
   inferSplitParticipantsFromExpense,
   simplifyDebts
 } from './balance';
@@ -187,6 +188,48 @@ describe('simplifyDebts', () => {
       }
     ];
     expect(simplifyDebts(expenses, members)).toEqual([]);
+  });
+});
+
+describe('inferShareValuesFromExpense', () => {
+  const members = ['A', 'B', 'C'];
+
+  it('recovers 1:3 share ratio from persisted owed cents (not dollar amounts)', () => {
+    const expense = makeExpense(
+      'shares-1-3',
+      100,
+      'A',
+      members,
+      'shares',
+      { B: 1, C: 3 },
+      ['B', 'C']
+    );
+    expect(expense.splitType).toBe('shares');
+
+    const shares = inferShareValuesFromExpense(expense, members);
+    expect(shares).toEqual({ B: 1, C: 3 });
+  });
+
+  it('round-trips through calculateSplits after recovery', () => {
+    const expense = makeExpense(
+      'shares-rt',
+      100,
+      'A',
+      members,
+      'shares',
+      { B: 1, C: 3 },
+      ['B', 'C']
+    );
+    const recovered = inferShareValuesFromExpense(expense, members);
+    const splits = calculateSplits(
+      expense.cost,
+      expense.paidBy,
+      members,
+      'shares',
+      recovered,
+      ['B', 'C']
+    );
+    expect(splits).toEqual(expense.splits);
   });
 });
 

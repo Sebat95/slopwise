@@ -156,6 +156,44 @@ export function calculateSplits(
 
 const SPLIT_SHARE_THRESHOLD_CENTS = 1;
 
+function gcd(a: number, b: number): number {
+  let x = Math.abs(Math.trunc(a));
+  let y = Math.abs(Math.trunc(b));
+  while (y !== 0) {
+    const t = y;
+    y = x % y;
+    x = t;
+  }
+  return x || 1;
+}
+
+/**
+ * Recover integer share counts from persisted net splits (owed cents are proportional
+ * to shares). Reduces by GCD so 25¢ : 75¢ becomes 1 : 3, not 25 : 75.
+ */
+export function inferShareValuesFromExpense(
+  expense: Pick<Expense, 'splits' | 'paidBy' | 'cost'>,
+  memberOrder: string[]
+): Record<string, number> {
+  const { involved, owedByMember } = inferSplitParticipantsFromExpense(
+    expense,
+    memberOrder
+  );
+  const owedAmounts = involved
+    .map((m) => owedByMember[m] ?? 0)
+    .filter((v) => v > 0);
+  if (owedAmounts.length === 0) {
+    return Object.fromEntries(involved.map((m) => [m, 1]));
+  }
+  const divisor = owedAmounts.reduce((acc, v) => gcd(acc, v));
+  const shares: Record<string, number> = {};
+  for (const m of involved) {
+    const owed = owedByMember[m] ?? 0;
+    shares[m] = owed > 0 ? Math.max(1, Math.trunc(owed / divisor)) : 1;
+  }
+  return shares;
+}
+
 /**
  * From persisted per-member net splits, recover who had a positive share of the bill
  * (the "split among" set). Uses: owed = paidBy ? cost - net : -net.
