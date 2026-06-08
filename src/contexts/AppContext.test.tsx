@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, cleanup } from '@testing-library/react';
 import { AppProvider, useApp } from './AppContext';
 import type { GoogleUserProfile, SheetData } from '../types';
+import { saveSheetMetadataCache } from '../utils/sheet-metadata-cache';
+import { emptySplitValuePresets } from '../utils/split-presets';
 
 const mockUseAuth = vi.fn();
 
@@ -39,12 +41,13 @@ vi.mock('../services/sheets-api', () => {
 import * as sheetsApi from '../services/sheets-api';
 
 function TestConsumer() {
-  const { expenses, error, isLoading } = useApp();
+  const { expenses, error, isLoading, members } = useApp();
   return (
     <div>
       <div data-testid="loading">{String(isLoading)}</div>
       <div data-testid="error">{error ?? ''}</div>
       <div data-testid="expenses-count">{String(expenses.length)}</div>
+      <div data-testid="members-count">{String(members.length)}</div>
     </div>
   );
 }
@@ -83,19 +86,63 @@ async function flushAll(): Promise<void> {
   await act(async () => {});
 }
 
+describe('AppProvider metadata cache', () => {
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue(authValue());
+    localStorage.setItem('slopwise_spreadsheet_id', 'sheet123');
+    localStorage.setItem('slopwise_spreadsheet_name', 'Test Sheet');
+    saveSheetMetadataCache('sheet123', {
+      members: ['A', 'B'],
+      memberProfiles: {},
+      currency: 'EUR',
+      lastSplitType: 'shares',
+      lastPaidBy: 'A',
+      lastSplitValuePresets: {
+        ...emptySplitValuePresets(),
+        shares: { A: 1, B: 2 }
+      }
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    localStorage.removeItem('slopwise_spreadsheet_id');
+    localStorage.removeItem('slopwise_spreadsheet_name');
+    localStorage.removeItem('slopwise_sheet_metadata_cache');
+  });
+
+  it('hydrates members from local metadata cache before loadData completes', () => {
+    mockUseAuth.mockReturnValue(authValue({ isAuthenticated: false }));
+
+    render(
+      <AppProvider>
+        <TestConsumer />
+      </AppProvider>
+    );
+
+    expect(screen.getByTestId('members-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('loading')).toHaveTextContent('true');
+    expect(vi.mocked(sheetsApi.readSheetData)).not.toHaveBeenCalled();
+  });
+});
+
 describe('AppProvider initial load retries', () => {
   beforeEach(() => {
     mockUseAuth.mockReturnValue(authValue());
     vi.useFakeTimers();
     localStorage.setItem('slopwise_spreadsheet_id', 'sheet123');
     localStorage.setItem('slopwise_spreadsheet_name', 'Test Sheet');
+    localStorage.removeItem('slopwise_sheet_metadata_cache');
   });
 
   afterEach(() => {
+    cleanup();
     mockUseAuth.mockReturnValue(authValue());
     vi.useRealTimers();
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
+    localStorage.removeItem('slopwise_sheet_metadata_cache');
     vi.restoreAllMocks();
   });
 
@@ -271,13 +318,16 @@ describe('AppProvider bootstrap write gate', () => {
     vi.useFakeTimers();
     localStorage.setItem('slopwise_spreadsheet_id', 'sheet123');
     localStorage.setItem('slopwise_spreadsheet_name', 'Test Sheet');
+    localStorage.removeItem('slopwise_sheet_metadata_cache');
   });
 
   afterEach(() => {
+    cleanup();
     mockUseAuth.mockReturnValue(authValue());
     vi.useRealTimers();
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
+    localStorage.removeItem('slopwise_sheet_metadata_cache');
     vi.restoreAllMocks();
   });
 

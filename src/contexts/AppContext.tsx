@@ -19,6 +19,10 @@ import * as sheetsApi from '../services/sheets-api';
 import { fetchUserProfile } from '../services/google-auth';
 import { useAuth } from './AuthContext';
 import { emptySplitValuePresets } from '../utils/split-presets';
+import {
+  loadSheetMetadataCache,
+  saveSheetMetadataCache
+} from '../utils/sheet-metadata-cache';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AppState {
@@ -127,28 +131,69 @@ function buildProfileMap(
   return profileMap;
 }
 
+function persistSheetMetadata(
+  spreadsheetId: string,
+  data: SheetData,
+  profileMap: Record<string, MemberInfo>
+): void {
+  if (data.members.length === 0) return;
+  saveSheetMetadataCache(spreadsheetId, {
+    members: data.members,
+    memberProfiles: profileMap,
+    currency: data.currency,
+    lastSplitType: data.lastSplitType,
+    lastPaidBy: data.lastPaidBy,
+    lastSplitValuePresets: data.lastSplitValuePresets
+  });
+}
+
+function persistMetadataFields(
+  spreadsheetId: string,
+  fields: Pick<
+    AppState,
+    | 'members'
+    | 'memberProfiles'
+    | 'currency'
+    | 'lastSplitType'
+    | 'lastPaidBy'
+    | 'lastSplitValuePresets'
+  >
+): void {
+  if (fields.members.length === 0) return;
+  saveSheetMetadataCache(spreadsheetId, fields);
+}
+
+function createInitialAppState(): AppState {
+  const spreadsheetId = getSsId();
+  const cached = spreadsheetId ? loadSheetMetadataCache(spreadsheetId) : null;
+
+  return {
+    spreadsheetId,
+    spreadsheetName: localStorage.getItem('slopwise_spreadsheet_name'),
+    members: cached?.members ?? [],
+    memberProfiles: cached?.memberProfiles ?? {},
+    expenses: [],
+    currency: cached?.currency ?? 'EUR',
+    lastSplitType: cached?.lastSplitType ?? 'equal',
+    lastPaidBy: cached?.lastPaidBy ?? '',
+    lastSplitValuePresets:
+      cached?.lastSplitValuePresets ?? emptySplitValuePresets(),
+    isLoading: Boolean(spreadsheetId),
+    isSyncing: false,
+    isBootstrapSettled: !spreadsheetId,
+    hasBootstrapWrite: false,
+    error: null,
+    lastSync: null
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
   const prevAuthenticatedRef = useRef<boolean | null>(null);
   const prevSpreadsheetIdRef = useRef<string | null>(null);
+  const initialLoadRequestedRef = useRef<string | null>(null);
 
-  const [state, setState] = useState<AppState>({
-    spreadsheetId: getSsId(),
-    spreadsheetName: localStorage.getItem('slopwise_spreadsheet_name'),
-    members: [],
-    memberProfiles: {},
-    expenses: [],
-    currency: 'EUR',
-    lastSplitType: 'equal',
-    lastPaidBy: '',
-    lastSplitValuePresets: emptySplitValuePresets(),
-    isLoading: Boolean(getSsId()),
-    isSyncing: false,
-    isBootstrapSettled: !getSsId(),
-    hasBootstrapWrite: false,
-    error: null,
-    lastSync: null
-  });
+  const [state, setState] = useState<AppState>(createInitialAppState);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -211,6 +256,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const deferExpenses = bootstrapWriteInFlightRef.current;
       initialLoadAppliedRef.current = true;
       hydratedSpreadsheetIdRef.current = ssId;
+
+      persistSheetMetadata(ssId, data, profileMap);
 
       if (deferExpenses) {
         expensesApplyDeferredRef.current = true;
@@ -312,6 +359,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         hydratedSpreadsheetIdRef.current = id;
         stateRef.current = nextState;
         setState(nextState);
+        persistSheetMetadata(id, data, profileMap);
       } catch (err) {
         setState((s) => ({
           ...s,
@@ -379,6 +427,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sheetsApi.invalidateExpenseMetaSheetCache();
     hydratedSpreadsheetIdRef.current = null;
     prevSpreadsheetIdRef.current = null;
+    initialLoadRequestedRef.current = null;
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
     resetBootstrapState();
@@ -419,19 +468,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       hydratedSpreadsheetIdRef.current === ssId &&
       initialLoadAppliedRef.current
     ) {
+      initialLoadRequestedRef.current = null;
       return;
     }
     if (prevSpreadsheetIdRef.current !== ssId) {
       resetBootstrapForSpreadsheet();
       prevSpreadsheetIdRef.current = ssId;
+      initialLoadRequestedRef.current = null;
     }
-    void loadData();
-  }, [
-    loadData,
-    resetBootstrapForSpreadsheet,
-    state.spreadsheetId,
-    isAuthenticated
-  ]);
+    if (initialLoadRequestedRef.current === ssId) return;
+    initialLoadRequestedRef.current = ssId;
+    void loadDataRef.current();
+  }, [resetBootstrapForSpreadsheet, state.spreadsheetId, isAuthenticated]);
 
   const finishBootstrapWrite = useCallback(() => {
     bootstrapWriteInFlightRef.current = false;
@@ -595,16 +643,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { name, email: '', photoUrl: '' }
       ];
       await sheetsApi.writeAllMemberProfiles(ssId, newProfiles).catch(() => {});
+      const nextMembers = [...current.members, name];
+      const nextProfiles = {
+        ...current.memberProfiles,
+        [name]: { name, email: '', photoUrl: '' }
+      };
       setState((s) => ({
         ...s,
-        members: [...s.members, name],
-        memberProfiles: {
-          ...s.memberProfiles,
-          [name]: { name, email: '', photoUrl: '' }
-        },
+        members: nextMembers,
+        memberProfiles: nextProfiles,
         isSyncing: false,
         error: null
       }));
+      persistMetadataFields(ssId, {
+        members: nextMembers,
+        memberProfiles: nextProfiles,
+        currency: current.currency,
+        lastSplitType: current.lastSplitType,
+        lastPaidBy: current.lastPaidBy,
+        lastSplitValuePresets: current.lastSplitValuePresets
+      });
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to add member');
       setState((s) => ({
@@ -698,6 +756,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           JSON.stringify(renamedPresets)
         );
         setState((s) => ({ ...s, isSyncing: false, error: null }));
+        persistMetadataFields(ssId, {
+          members: renamedMembers,
+          memberProfiles: renamedProfileMap,
+          currency: current.currency,
+          lastSplitType: current.lastSplitType,
+          lastPaidBy: nextLastPaidBy,
+          lastSplitValuePresets: renamedPresets
+        });
       } catch (err) {
         await loadData();
         const message = getErrorMessage(err, 'Failed to rename member');
@@ -884,6 +950,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
             error: null,
             lastSync: new Date()
           }));
+          persistMetadataFields(ssId, {
+            members: allMembers,
+            memberProfiles: current.memberProfiles,
+            currency: current.currency,
+            lastSplitType: current.lastSplitType,
+            lastPaidBy: current.lastPaidBy,
+            lastSplitValuePresets: current.lastSplitValuePresets
+          });
         } else {
           setState((s) => ({ ...s, isSyncing: false, error: null }));
         }
@@ -901,23 +975,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const setLastSplitType = useCallback((type: SplitType) => {
+    const current = stateRef.current;
     setState((s) => ({ ...s, lastSplitType: type }));
     const ssId = getSsId();
     if (ssId) {
       sheetsApi.saveSetting(ssId, 'lastSplitType', type).catch(() => {});
+      persistMetadataFields(ssId, {
+        members: current.members,
+        memberProfiles: current.memberProfiles,
+        currency: current.currency,
+        lastSplitType: type,
+        lastPaidBy: current.lastPaidBy,
+        lastSplitValuePresets: current.lastSplitValuePresets
+      });
     }
   }, []);
 
   const setLastPaidBy = useCallback((name: string) => {
+    const current = stateRef.current;
     setState((s) => ({ ...s, lastPaidBy: name }));
     const ssId = getSsId();
     if (ssId) {
       sheetsApi.saveSetting(ssId, 'lastPaidBy', name).catch(() => {});
+      persistMetadataFields(ssId, {
+        members: current.members,
+        memberProfiles: current.memberProfiles,
+        currency: current.currency,
+        lastSplitType: current.lastSplitType,
+        lastPaidBy: name,
+        lastSplitValuePresets: current.lastSplitValuePresets
+      });
     }
   }, []);
 
   const setLastSplitValuesForType = useCallback(
     (type: SplitType, values: Record<string, number>) => {
+      const current = stateRef.current;
       const sanitized: Record<string, number> = {};
       for (const [member, value] of Object.entries(values)) {
         const trimmed = member.trim();
@@ -926,7 +1019,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       const next = {
-        ...stateRef.current.lastSplitValuePresets,
+        ...current.lastSplitValuePresets,
         [type]: sanitized
       };
       setState((s) => ({ ...s, lastSplitValuePresets: next }));
@@ -936,6 +1029,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         sheetsApi
           .saveSetting(ssId, 'lastSplitValuePresets', JSON.stringify(next))
           .catch(() => {});
+        persistMetadataFields(ssId, {
+          members: current.members,
+          memberProfiles: current.memberProfiles,
+          currency: current.currency,
+          lastSplitType: current.lastSplitType,
+          lastPaidBy: current.lastPaidBy,
+          lastSplitValuePresets: next
+        });
       }
     },
     []
