@@ -11,6 +11,7 @@ import {
 import type {
   Expense,
   MemberInfo,
+  SheetData,
   SplitType,
   SplitValuePresets
 } from '../types';
@@ -32,6 +33,8 @@ interface AppState {
   lastSplitValuePresets: SplitValuePresets;
   isLoading: boolean;
   isSyncing: boolean;
+  isBootstrapSettled: boolean;
+  hasBootstrapWrite: boolean;
   error: string | null;
   lastSync: Date | null;
 }
@@ -62,6 +65,7 @@ interface AppActions {
     values: Record<string, number>
   ) => void;
   disconnect: () => void;
+  waitForBootstrapSettled: () => Promise<void>;
 }
 
 type AppContextValue = AppState & AppActions;
@@ -126,6 +130,7 @@ function buildProfileMap(
 export function AppProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
   const prevAuthenticatedRef = useRef<boolean | null>(null);
+  const prevSpreadsheetIdRef = useRef<string | null>(null);
 
   const [state, setState] = useState<AppState>({
     spreadsheetId: getSsId(),
@@ -139,6 +144,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     lastSplitValuePresets: emptySplitValuePresets(),
     isLoading: Boolean(getSsId()),
     isSyncing: false,
+    isBootstrapSettled: !getSsId(),
+    hasBootstrapWrite: false,
     error: null,
     lastSync: null
   });
@@ -147,6 +154,104 @@ export function AppProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
   const latestReadRequestIdRef = useRef(0);
   const hydratedSpreadsheetIdRef = useRef<string | null>(null);
+  const loadDataRef = useRef<() => Promise<void>>(async () => {});
+
+  const bootstrapWriteStartedRef = useRef(false);
+  const bootstrapWriteInFlightRef = useRef(false);
+  const expensesApplyDeferredRef = useRef(false);
+  const initialLoadAppliedRef = useRef(false);
+  const isBootstrapSettledRef = useRef(!getSsId());
+  const bootstrapSettledWaitersRef = useRef<Array<() => void>>([]);
+
+  const markBootstrapSettled = useCallback(() => {
+    if (isBootstrapSettledRef.current) return;
+    isBootstrapSettledRef.current = true;
+    setState((s) => ({ ...s, isBootstrapSettled: true }));
+    for (const resolve of bootstrapSettledWaitersRef.current) resolve();
+    bootstrapSettledWaitersRef.current = [];
+  }, []);
+
+  const resetBootstrapState = useCallback(() => {
+    bootstrapWriteStartedRef.current = false;
+    bootstrapWriteInFlightRef.current = false;
+    expensesApplyDeferredRef.current = false;
+    initialLoadAppliedRef.current = false;
+    isBootstrapSettledRef.current = true;
+    bootstrapSettledWaitersRef.current = [];
+    setState((s) => ({
+      ...s,
+      isBootstrapSettled: true,
+      hasBootstrapWrite: false
+    }));
+  }, []);
+
+  const resetBootstrapForSpreadsheet = useCallback(() => {
+    bootstrapWriteStartedRef.current = false;
+    bootstrapWriteInFlightRef.current = false;
+    expensesApplyDeferredRef.current = false;
+    initialLoadAppliedRef.current = false;
+    isBootstrapSettledRef.current = false;
+    bootstrapSettledWaitersRef.current = [];
+    setState((s) => ({
+      ...s,
+      isBootstrapSettled: false,
+      hasBootstrapWrite: false
+    }));
+  }, []);
+
+  const waitForBootstrapSettled = useCallback((): Promise<void> => {
+    if (isBootstrapSettledRef.current) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      bootstrapSettledWaitersRef.current.push(resolve);
+    });
+  }, []);
+
+  const applyLoadSnapshot = useCallback(
+    (ssId: string, data: SheetData, profileMap: Record<string, MemberInfo>) => {
+      const deferExpenses = bootstrapWriteInFlightRef.current;
+      initialLoadAppliedRef.current = true;
+      hydratedSpreadsheetIdRef.current = ssId;
+
+      if (deferExpenses) {
+        expensesApplyDeferredRef.current = true;
+        setState((s) => ({
+          ...s,
+          spreadsheetId: ssId,
+          members: data.members,
+          memberProfiles: profileMap,
+          currency: data.currency,
+          lastSplitType: data.lastSplitType,
+          lastPaidBy: data.lastPaidBy,
+          lastSplitValuePresets: data.lastSplitValuePresets,
+          isLoading: false,
+          error: null,
+          lastSync: new Date()
+        }));
+        return;
+      }
+
+      expensesApplyDeferredRef.current = false;
+      setState((s) => ({
+        ...s,
+        spreadsheetId: ssId,
+        members: data.members,
+        memberProfiles: profileMap,
+        expenses: data.expenses,
+        currency: data.currency,
+        lastSplitType: data.lastSplitType,
+        lastPaidBy: data.lastPaidBy,
+        lastSplitValuePresets: data.lastSplitValuePresets,
+        isLoading: false,
+        error: null,
+        lastSync: new Date()
+      }));
+
+      if (!bootstrapWriteInFlightRef.current) {
+        markBootstrapSettled();
+      }
+    },
+    [markBootstrapSettled]
+  );
 
   const readSpreadsheetSnapshot = useCallback(async (spreadsheetId: string) => {
     const [data, profiles] = await Promise.all([
@@ -172,13 +277,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const connectSpreadsheet = useCallback(
     async (id: string, name: string) => {
       beginReadRequest();
+      resetBootstrapForSpreadsheet();
       sheetsApi.invalidateExpenseMetaSheetCache(id);
       setState((s) => ({ ...s, isLoading: true, error: null }));
       try {
         const { data, profileMap } = await readSpreadsheetSnapshot(id);
         localStorage.setItem('slopwise_spreadsheet_id', id);
         localStorage.setItem('slopwise_spreadsheet_name', name);
-        hydratedSpreadsheetIdRef.current = id;
 
         const nextState: AppState = {
           ...stateRef.current,
@@ -193,10 +298,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           lastSplitValuePresets: data.lastSplitValuePresets,
           isLoading: false,
           isSyncing: false,
+          isBootstrapSettled: true,
+          hasBootstrapWrite: false,
           error: null,
           lastSync: new Date()
         };
 
+        bootstrapWriteStartedRef.current = false;
+        bootstrapWriteInFlightRef.current = false;
+        expensesApplyDeferredRef.current = false;
+        initialLoadAppliedRef.current = true;
+        isBootstrapSettledRef.current = true;
+        hydratedSpreadsheetIdRef.current = id;
         stateRef.current = nextState;
         setState(nextState);
       } catch (err) {
@@ -210,7 +323,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           : new Error('Failed to open spreadsheet');
       }
     },
-    [beginReadRequest, readSpreadsheetSnapshot]
+    [beginReadRequest, readSpreadsheetSnapshot, resetBootstrapForSpreadsheet]
   );
 
   const loadData = useCallback(async () => {
@@ -227,22 +340,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const { data, profileMap } = await readSpreadsheetSnapshot(ssId);
           if (!isActiveReadRequest(requestId)) return;
-          hydratedSpreadsheetIdRef.current = ssId;
-
-          setState((s) => ({
-            ...s,
-            spreadsheetId: ssId,
-            members: data.members,
-            memberProfiles: profileMap,
-            expenses: data.expenses,
-            currency: data.currency,
-            lastSplitType: data.lastSplitType,
-            lastPaidBy: data.lastPaidBy,
-            lastSplitValuePresets: data.lastSplitValuePresets,
-            isLoading: false,
-            error: null,
-            lastSync: new Date()
-          }));
+          applyLoadSnapshot(ssId, data, profileMap);
           return;
         } catch (err) {
           lastErr = err;
@@ -265,14 +363,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
         error: getErrorMessage(err, 'Failed to load data')
       }));
     }
-  }, [beginReadRequest, isActiveReadRequest, readSpreadsheetSnapshot]);
+  }, [
+    beginReadRequest,
+    isActiveReadRequest,
+    readSpreadsheetSnapshot,
+    applyLoadSnapshot
+  ]);
+
+  useEffect(() => {
+    loadDataRef.current = loadData;
+  }, [loadData]);
 
   const disconnect = useCallback(() => {
     beginReadRequest();
     sheetsApi.invalidateExpenseMetaSheetCache();
     hydratedSpreadsheetIdRef.current = null;
+    prevSpreadsheetIdRef.current = null;
     localStorage.removeItem('slopwise_spreadsheet_id');
     localStorage.removeItem('slopwise_spreadsheet_name');
+    resetBootstrapState();
     setState((s) => ({
       ...s,
       spreadsheetId: null,
@@ -283,9 +392,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       lastSplitType: 'equal',
       lastPaidBy: '',
       lastSplitValuePresets: emptySplitValuePresets(),
+      isLoading: false,
       error: null
     }));
-  }, [beginReadRequest]);
+  }, [beginReadRequest, resetBootstrapState]);
 
   useEffect(() => {
     const prev = prevAuthenticatedRef.current;
@@ -305,47 +415,92 @@ export function AppProvider({ children }: { children: ReactNode }) {
       hydratedSpreadsheetIdRef.current = null;
       return;
     }
-    if (hydratedSpreadsheetIdRef.current === ssId) return;
+    if (
+      hydratedSpreadsheetIdRef.current === ssId &&
+      initialLoadAppliedRef.current
+    ) {
+      return;
+    }
+    if (prevSpreadsheetIdRef.current !== ssId) {
+      resetBootstrapForSpreadsheet();
+      prevSpreadsheetIdRef.current = ssId;
+    }
     void loadData();
-  }, [loadData, state.spreadsheetId, isAuthenticated]);
+  }, [
+    loadData,
+    resetBootstrapForSpreadsheet,
+    state.spreadsheetId,
+    isAuthenticated
+  ]);
 
-  const addExpense = useCallback(async (expense: Omit<Expense, 'id'>) => {
-    const ssId = getSsId();
-    if (!ssId) throw new Error('No spreadsheet selected');
+  const finishBootstrapWrite = useCallback(() => {
+    bootstrapWriteInFlightRef.current = false;
+    if (expensesApplyDeferredRef.current || !initialLoadAppliedRef.current) {
+      void loadDataRef.current();
+      return;
+    }
+    markBootstrapSettled();
+  }, [markBootstrapSettled]);
 
-    const current = stateRef.current;
-    const newExpense: Expense = { ...expense, id: uuidv4() };
-    setState((s) => ({
-      ...s,
-      expenses: [...s.expenses, newExpense],
-      isSyncing: true,
-      error: null
-    }));
+  const addExpense = useCallback(
+    async (expense: Omit<Expense, 'id'>) => {
+      const ssId = getSsId();
+      if (!ssId) throw new Error('No spreadsheet selected');
 
-    try {
-      await sheetsApi.appendExpense(ssId, newExpense, current.members);
-      await sheetsApi.appendExpenseMetadataRow(
-        ssId,
-        newExpense,
-        current.members
-      );
-      setState((s) => ({ ...s, isSyncing: false, error: null }));
-    } catch (err) {
-      const message = getErrorMessage(err, 'Failed to save expense');
+      if (bootstrapWriteStartedRef.current && !isBootstrapSettledRef.current) {
+        await waitForBootstrapSettled();
+      }
+
+      const isBootstrapWrite = !bootstrapWriteStartedRef.current;
+      if (isBootstrapWrite) {
+        bootstrapWriteStartedRef.current = true;
+        bootstrapWriteInFlightRef.current = true;
+        setState((s) => ({ ...s, hasBootstrapWrite: true }));
+      }
+
+      const current = stateRef.current;
+      const newExpense: Expense = { ...expense, id: uuidv4() };
       setState((s) => ({
         ...s,
-        isSyncing: false,
-        error: message,
-        expenses: s.expenses.filter((e) => e.id !== newExpense.id)
+        expenses: [...s.expenses, newExpense],
+        isSyncing: true,
+        error: null
       }));
-      throw err instanceof Error ? err : new Error(message);
-    }
-  }, []);
+
+      try {
+        await sheetsApi.appendExpense(ssId, newExpense, current.members);
+        await sheetsApi.appendExpenseMetadataRow(
+          ssId,
+          newExpense,
+          current.members
+        );
+        setState((s) => ({ ...s, isSyncing: false, error: null }));
+        if (isBootstrapWrite) {
+          finishBootstrapWrite();
+        }
+      } catch (err) {
+        if (isBootstrapWrite) {
+          bootstrapWriteInFlightRef.current = false;
+        }
+        const message = getErrorMessage(err, 'Failed to save expense');
+        setState((s) => ({
+          ...s,
+          isSyncing: false,
+          error: message,
+          expenses: s.expenses.filter((e) => e.id !== newExpense.id)
+        }));
+        throw err instanceof Error ? err : new Error(message);
+      }
+    },
+    [finishBootstrapWrite, waitForBootstrapSettled]
+  );
 
   const updateExpense = useCallback(
     async (expenseId: string, updated: Omit<Expense, 'id'>) => {
       const ssId = getSsId();
       if (!ssId) throw new Error('No spreadsheet selected');
+
+      await waitForBootstrapSettled();
 
       const current = stateRef.current;
       const idx = current.expenses.findIndex((e) => e.id === expenseId);
@@ -388,7 +543,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw err instanceof Error ? err : new Error(message);
       }
     },
-    []
+    [waitForBootstrapSettled]
   );
 
   const deleteExpense = useCallback(async (expenseId: string) => {
@@ -802,7 +957,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLastSplitType,
       setLastPaidBy,
       setLastSplitValuesForType,
-      disconnect
+      disconnect,
+      waitForBootstrapSettled
     }),
     [
       connectSpreadsheet,
@@ -819,7 +975,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLastSplitType,
       setLastPaidBy,
       setLastSplitValuesForType,
-      disconnect
+      disconnect,
+      waitForBootstrapSettled
     ]
   );
 

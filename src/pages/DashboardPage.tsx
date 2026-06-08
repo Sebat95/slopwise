@@ -163,14 +163,6 @@ export default function DashboardPage() {
     if (ok) void deleteExpense(id).catch(() => {});
   };
 
-  if (isLoading && expenses.length === 0) {
-    return (
-      <Layout>
-        <LoadingSpinner text="Loading expenses..." />
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="mx-auto max-w-lg px-4 py-4">
@@ -307,7 +299,9 @@ export default function DashboardPage() {
             </h2>
           </div>
 
-          {recentExpenses.length === 0 ? (
+          {isLoading && expenses.length === 0 ? (
+            <LoadingSpinner text="Loading expenses..." />
+          ) : recentExpenses.length === 0 ? (
             <EmptyState
               icon={<Receipt size={40} />}
               title="No expenses yet"

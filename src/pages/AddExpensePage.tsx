@@ -47,7 +47,8 @@ export default function AddExpensePage() {
     expenses,
     lastSplitType,
     lastPaidBy,
-    isLoading,
+    isBootstrapSettled,
+    hasBootstrapWrite,
     addExpense,
     updateExpense,
     setLastSplitType,
@@ -164,7 +165,6 @@ export default function AddExpensePage() {
     }
     return out;
   }, [splitRaw, members, splitType]);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasInitializedNewExpense = useRef(false);
 
@@ -242,15 +242,21 @@ export default function AddExpensePage() {
 
   const cost = parseMoneyCents(amount);
 
-  if (isLoading && members.length === 0) {
-    return (
-      <Layout showNav={false}>
-        <LoadingSpinner
-          text={editId ? 'Loading expense...' : 'Loading members...'}
-        />
-      </Layout>
-    );
-  }
+  const waitingForBootstrap = hasBootstrapWrite && !isBootstrapSettled;
+  const membersLoading = members.length === 0;
+  const saveDisabled = membersLoading || waitingForBootstrap;
+  const headerSaveLabel = waitingForBootstrap
+    ? 'Waiting for sync...'
+    : membersLoading
+      ? 'Loading members...'
+      : 'Save';
+  const saveLabel = waitingForBootstrap
+    ? 'Waiting for sync...'
+    : membersLoading
+      ? 'Loading members...'
+      : isEdit
+        ? 'Update Expense'
+        : 'Add Expense';
 
   const toggleInvolved = (m: string) => {
     const next = new Set(involved);
@@ -342,65 +348,59 @@ export default function AddExpensePage() {
     }
 
     setError(null);
-    setSaving(true);
 
-    try {
-      if (!isEdit) {
-        const rememberedValues =
-          splitType === 'equal'
-            ? equalSplitRememberPreset(involved)
-            : splitType === 'shares'
-              ? Object.fromEntries(
-                  [...involved].map((member) => [
-                    member,
-                    shareHundredthsToAmount(splitValues[member] ?? 0)
-                  ])
-                )
-              : [...involved].reduce<Record<string, number>>((acc, member) => {
-                  acc[member] = splitValues[member] ?? 0;
-                  return acc;
-                }, {});
-        setLastSplitValuesForType(splitType, rememberedValues);
-      }
-      const splits = calculateSplits(
-        cost,
-        paidBy,
-        members,
-        splitType,
-        splitValues,
-        [...involved]
-      );
-      const shareInputs =
-        splitType === 'shares'
-          ? Object.fromEntries(
-              [...involved].map((member) => [
-                member,
-                shareHundredthsToAmount(splitValues[member] ?? 0)
-              ])
-            )
-          : undefined;
-      const expenseData = {
-        date,
-        description: description.trim(),
-        category,
-        cost,
-        currency: expCurrency,
-        paidBy,
-        splitType,
-        splits,
-        shareInputs
-      };
-
-      if (isEdit && editId) {
-        await updateExpense(editId, expenseData);
-      } else {
-        await addExpense(expenseData);
-      }
-      navigate(-1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save expense');
-      setSaving(false);
+    if (!isEdit) {
+      const rememberedValues =
+        splitType === 'equal'
+          ? equalSplitRememberPreset(involved)
+          : splitType === 'shares'
+            ? Object.fromEntries(
+                [...involved].map((member) => [
+                  member,
+                  shareHundredthsToAmount(splitValues[member] ?? 0)
+                ])
+              )
+            : [...involved].reduce<Record<string, number>>((acc, member) => {
+                acc[member] = splitValues[member] ?? 0;
+                return acc;
+              }, {});
+      setLastSplitValuesForType(splitType, rememberedValues);
     }
+    const splits = calculateSplits(
+      cost,
+      paidBy,
+      members,
+      splitType,
+      splitValues,
+      [...involved]
+    );
+    const shareInputs =
+      splitType === 'shares'
+        ? Object.fromEntries(
+            [...involved].map((member) => [
+              member,
+              shareHundredthsToAmount(splitValues[member] ?? 0)
+            ])
+          )
+        : undefined;
+    const expenseData = {
+      date,
+      description: description.trim(),
+      category,
+      cost,
+      currency: expCurrency,
+      paidBy,
+      splitType,
+      splits,
+      shareInputs
+    };
+
+    if (isEdit && editId) {
+      void updateExpense(editId, expenseData).catch(() => {});
+    } else {
+      void addExpense(expenseData).catch(() => {});
+    }
+    navigate(-1);
   };
 
   const involvedArr = [...involved];
@@ -423,11 +423,11 @@ export default function AddExpensePage() {
           </h1>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saveDisabled}
             className="text-primary hover:text-primary-light flex items-center gap-1 text-sm font-semibold transition-colors disabled:opacity-50"
           >
             <Check size={18} />
-            <span>{saving ? 'Saving...' : 'Save'}</span>
+            <span>{headerSaveLabel}</span>
           </button>
         </div>
 
@@ -515,22 +515,26 @@ export default function AddExpensePage() {
             <label className="text-text-secondary mb-2 flex items-center gap-1 text-xs font-medium">
               <User size={12} /> Paid by
             </label>
-            <div className="flex flex-wrap gap-2">
-              {members.map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setPaidBy(m)}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
-                    paidBy === m
-                      ? 'bg-primary/15 border-primary text-primary font-medium'
-                      : 'bg-bg-card border-border text-text-secondary hover:border-primary/30'
-                  }`}
-                >
-                  <Avatar name={m} size="sm" />
-                  {m}
-                </button>
-              ))}
-            </div>
+            {membersLoading ? (
+              <LoadingSpinner text="Loading members..." />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {members.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setPaidBy(m)}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                      paidBy === m
+                        ? 'bg-primary/15 border-primary text-primary font-medium'
+                        : 'bg-bg-card border-border text-text-secondary hover:border-primary/30'
+                    }`}
+                  >
+                    <Avatar name={m} size="sm" />
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Split type */}
@@ -667,10 +671,10 @@ export default function AddExpensePage() {
 
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saveDisabled}
             className="bg-primary hover:bg-primary-dark w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >
-            {saving ? 'Saving...' : isEdit ? 'Update Expense' : 'Add Expense'}
+            {saveLabel}
           </button>
         </div>
       </div>

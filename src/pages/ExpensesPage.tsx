@@ -67,14 +67,6 @@ export default function ExpensesPage() {
     if (ok) void deleteExpense(id).catch(() => {});
   };
 
-  if (isLoading && expenses.length === 0) {
-    return (
-      <Layout>
-        <LoadingSpinner text="Loading expenses..." />
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="mx-auto max-w-lg px-4 py-4">
@@ -129,7 +121,9 @@ export default function ExpensesPage() {
           </div>
         )}
 
-        {filtered.length === 0 ? (
+        {isLoading && expenses.length === 0 ? (
+          <LoadingSpinner text="Loading expenses..." />
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Receipt size={40} />}
             title={search ? 'No matches' : 'No expenses yet'}

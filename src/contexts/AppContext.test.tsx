@@ -9,6 +9,10 @@ vi.mock('./AuthContext', () => ({
   useAuth: () => mockUseAuth()
 }));
 
+vi.mock('../services/google-auth', () => ({
+  fetchUserProfile: vi.fn()
+}));
+
 function authValue(overrides?: { isAuthenticated?: boolean }) {
   return {
     isAuthenticated: true,
@@ -25,6 +29,8 @@ vi.mock('../services/sheets-api', () => {
   return {
     readSheetData: vi.fn(),
     readMemberProfiles: vi.fn(),
+    appendExpense: vi.fn(),
+    appendExpenseMetadataRow: vi.fn(),
     invalidateExpenseMetaSheetCache: vi.fn()
   };
 });
@@ -212,5 +218,148 @@ describe('AppProvider initial load retries', () => {
     expect(localStorage.getItem('slopwise_spreadsheet_id')).toBeNull();
     expect(screen.getByTestId('expenses-count')).toHaveTextContent('0');
     expect(readSheetDataMock.mock.calls.length).toBe(1);
+  });
+});
+
+function BootstrapConsumer() {
+  const {
+    expenses,
+    members,
+    isBootstrapSettled,
+    hasBootstrapWrite,
+    addExpense,
+    waitForBootstrapSettled
+  } = useApp();
+  return (
+    <div>
+      <div data-testid="settled">{String(isBootstrapSettled)}</div>
+      <div data-testid="bootstrap-write">{String(hasBootstrapWrite)}</div>
+      <div data-testid="members-count">{String(members.length)}</div>
+      <div data-testid="expenses-count">{String(expenses.length)}</div>
+      <button
+        type="button"
+        data-testid="add-expense"
+        onClick={() =>
+          void addExpense({
+            date: '2026-06-08',
+            description: 'Coffee',
+            category: 'Drinks',
+            cost: 500,
+            currency: 'EUR',
+            paidBy: 'A',
+            splitType: 'equal',
+            splits: { A: 250, B: 250 }
+          })
+        }
+      >
+        Add
+      </button>
+      <button
+        type="button"
+        data-testid="wait-settled"
+        onClick={() => void waitForBootstrapSettled()}
+      >
+        Wait
+      </button>
+    </div>
+  );
+}
+
+describe('AppProvider bootstrap write gate', () => {
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue(authValue());
+    vi.useFakeTimers();
+    localStorage.setItem('slopwise_spreadsheet_id', 'sheet123');
+    localStorage.setItem('slopwise_spreadsheet_name', 'Test Sheet');
+  });
+
+  afterEach(() => {
+    mockUseAuth.mockReturnValue(authValue());
+    vi.useRealTimers();
+    localStorage.removeItem('slopwise_spreadsheet_id');
+    localStorage.removeItem('slopwise_spreadsheet_name');
+    vi.restoreAllMocks();
+  });
+
+  it('defers expense replace during bootstrap write then re-fetches', async () => {
+    const readSheetDataMock = vi.mocked(sheetsApi.readSheetData);
+    const readMemberProfilesMock = vi.mocked(sheetsApi.readMemberProfiles);
+    const appendExpenseMock = vi.mocked(sheetsApi.appendExpense);
+    const appendMetaMock = vi.mocked(sheetsApi.appendExpenseMetadataRow);
+
+    readMemberProfilesMock.mockResolvedValue([]);
+
+    let resolveInitialRead: ((value: SheetData) => void) | undefined;
+    readSheetDataMock.mockImplementationOnce(
+      () =>
+        new Promise<SheetData>((resolve) => {
+          resolveInitialRead = resolve;
+        })
+    );
+    readSheetDataMock.mockResolvedValue(makeSheetData({ expenses: [] }));
+
+    let resolveAppend: (() => void) | undefined;
+    appendExpenseMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveAppend = resolve;
+        })
+    );
+    appendMetaMock.mockResolvedValue(undefined);
+
+    render(
+      <AppProvider>
+        <BootstrapConsumer />
+      </AppProvider>
+    );
+    await flushAll();
+
+    await act(async () => {
+      screen.getByTestId('add-expense').click();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('bootstrap-write')).toHaveTextContent('true');
+    expect(screen.getByTestId('expenses-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('settled')).toHaveTextContent('false');
+
+    await act(async () => {
+      resolveInitialRead?.(makeSheetData({ expenses: [] }));
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('expenses-count')).toHaveTextContent('1');
+
+    await act(async () => {
+      resolveAppend?.();
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+
+    expect(readSheetDataMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId('settled')).toHaveTextContent('true');
+  });
+
+  it('marks bootstrap settled after initial load when no early write', async () => {
+    const readSheetDataMock = vi.mocked(sheetsApi.readSheetData);
+    const readMemberProfilesMock = vi.mocked(sheetsApi.readMemberProfiles);
+
+    readMemberProfilesMock.mockResolvedValue([]);
+    readSheetDataMock.mockResolvedValue(makeSheetData());
+
+    render(
+      <AppProvider>
+        <BootstrapConsumer />
+      </AppProvider>
+    );
+
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('settled')).toHaveTextContent('true');
+    expect(screen.getByTestId('expenses-count')).toHaveTextContent('1');
   });
 });

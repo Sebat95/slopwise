@@ -33,10 +33,15 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function hasSpreadsheetHint(): boolean {
+  return Boolean(localStorage.getItem('slopwise_spreadsheet_id'));
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const optimisticAuth = hasSpreadsheetHint();
   const [state, setState] = useState<AuthState>({
-    isAuthenticated: false,
-    isLoading: true,
+    isAuthenticated: optimisticAuth,
+    isLoading: !optimisticAuth,
     error: null,
     user: null
   });
@@ -116,16 +121,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
       await signIn();
-      const session = await getSession();
-      if (!session.authenticated) {
-        throw new Error('Secure session was not established');
-      }
       setState({
         isAuthenticated: true,
         isLoading: false,
         error: null,
-        user: session.user
+        user: null
       });
+      void getSession()
+        .then((session) => {
+          if (!session.authenticated) return;
+          setState((s) =>
+            s.isAuthenticated ? { ...s, user: session.user } : s
+          );
+        })
+        .catch(() => {});
     } catch (err) {
       setState({
         isAuthenticated: false,

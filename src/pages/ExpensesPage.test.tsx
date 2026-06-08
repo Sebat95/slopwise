@@ -44,6 +44,22 @@ describe('ExpensesPage', () => {
     });
   });
 
+  it('renders layout with inline loading instead of blocking the whole page', () => {
+    mockUseApp.mockReturnValue({
+      expenses: [],
+      currency: 'USD',
+      isLoading: true,
+      deleteExpense: vi.fn()
+    });
+
+    renderExpensesPage();
+
+    expect(
+      screen.getByRole('heading', { name: 'Expenses' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Loading expenses...')).toBeInTheDocument();
+  });
+
   it('does not pass per-user split line: no you owe / you get / settled', () => {
     renderExpensesPage();
 

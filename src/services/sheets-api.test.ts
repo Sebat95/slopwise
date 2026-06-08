@@ -1,4 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+vi.mock('./google-auth', () => ({
+  notifySessionExpired: vi.fn(),
+  onSessionExpired: vi.fn(() => () => {})
+}));
 import {
   readSheetData,
   deleteExpenseRow,
