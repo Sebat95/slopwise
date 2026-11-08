@@ -21,6 +21,9 @@ steps:
       - -c
       - |
         set -euo pipefail
+        # This image already installs classic Yarn at /usr/bin/yarn.
+        # Corepack ships the same binary, so the old one has to go first.
+        rm -f /usr/bin/yarn /usr/bin/yarnpkg
         npm install -g corepack@latest
         corepack enable
         corepack prepare yarn@4.12.0 --activate
