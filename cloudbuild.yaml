@@ -12,7 +12,7 @@ availableSecrets:
 
 steps:
   # Unit + e2e tests before image build; failures stop the pipeline.
-  - id: test
+  - id: tests
     name: mcr.microsoft.com/playwright:v1.65.0-jammy
     entrypoint: bash
     env:
@@ -35,7 +35,8 @@ steps:
       - GOOGLE_CLIENT_ID
     timeout: 1200s
 
-  - name: gcr.io/cloud-builders/docker
+  - id: build-image
+    name: gcr.io/cloud-builders/docker
     entrypoint: bash
     args:
       - -c
@@ -50,17 +51,14 @@ steps:
       - VITE_FIREBASE_CONFIG
       - GOOGLE_CLIENT_ID
 
-  - name: gcr.io/cloud-builders/docker
+  - id: push-image-sha
+    name: gcr.io/cloud-builders/docker
     args:
       - push
       - ${_IMAGE}:$SHORT_SHA
 
-  - name: gcr.io/cloud-builders/docker
-    args:
-      - push
-      - ${_IMAGE}:latest
-
-  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  - id: deploy-cloud-run
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
       - run
