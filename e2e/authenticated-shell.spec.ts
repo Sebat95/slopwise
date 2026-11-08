@@ -23,7 +23,7 @@ test.describe('mocked API session', () => {
 
     await page.route('**/api/googleProxy', async (route) => {
       const raw = route.request().postData();
-      let url = '';
+      let url: string;
       try {
         url = raw ? ((JSON.parse(raw) as { url?: string }).url ?? '') : '';
       } catch {

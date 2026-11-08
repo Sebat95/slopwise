@@ -33,6 +33,8 @@ vi.mock('../services/sheets-api', () => {
     readMemberProfiles: vi.fn(),
     appendExpense: vi.fn(),
     appendExpenseMetadataRow: vi.fn(),
+    updateExpenseInSheet: vi.fn(),
+    deleteExpenseFromSheet: vi.fn(),
     invalidateExpenseMetaSheetCache: vi.fn()
   };
 });
@@ -411,5 +413,316 @@ describe('AppProvider bootstrap write gate', () => {
 
     expect(screen.getByTestId('settled')).toHaveTextContent('true');
     expect(screen.getByTestId('expenses-count')).toHaveTextContent('1');
+  });
+});
+
+function MutationConsumer() {
+  const {
+    expenses,
+    error,
+    isSyncing,
+    updateExpense,
+    deleteExpense,
+    addExpense
+  } = useApp();
+  return (
+    <div>
+      <div data-testid="count">{String(expenses.length)}</div>
+      <div data-testid="desc">
+        {expenses.map((e) => e.description).join('|')}
+      </div>
+      <div data-testid="error">{error ?? ''}</div>
+      <div data-testid="syncing">{String(isSyncing)}</div>
+      <button
+        type="button"
+        data-testid="update"
+        onClick={() =>
+          void updateExpense(expenses[0].id, {
+            ...expenses[0],
+            description: 'Changed'
+          }).catch(() => {})
+        }
+      >
+        Update
+      </button>
+      <button
+        type="button"
+        data-testid="delete"
+        onClick={() => void deleteExpense(expenses[0].id).catch(() => {})}
+      >
+        Delete
+      </button>
+      <button
+        type="button"
+        data-testid="update-and-delete"
+        onClick={() => {
+          void updateExpense(expenses[0].id, {
+            ...expenses[0],
+            description: 'Changed'
+          }).catch(() => {});
+          void deleteExpense(expenses[0].id).catch(() => {});
+        }}
+      >
+        Both
+      </button>
+      <button
+        type="button"
+        data-testid="add"
+        onClick={() =>
+          void addExpense({
+            date: '2026-06-08',
+            description: 'Coffee',
+            category: 'Drinks',
+            cost: 500,
+            currency: 'EUR',
+            paidBy: 'A',
+            splitType: 'equal',
+            splits: { A: 250, B: 250 }
+          }).catch(() => {})
+        }
+      >
+        Add
+      </button>
+      <button
+        type="button"
+        data-testid="fail-lunch"
+        onClick={() => {
+          const lunch = expenses.find((e) => e.id === 'e1');
+          if (!lunch) return;
+          void updateExpense('e1', { ...lunch, description: 'Changed' }).catch(
+            () => {}
+          );
+        }}
+      >
+        Fail lunch
+      </button>
+      <button
+        type="button"
+        data-testid="delete-dinner"
+        onClick={() => void deleteExpense('e2').catch(() => {})}
+      >
+        Delete dinner
+      </button>
+    </div>
+  );
+}
+
+describe('AppProvider expense mutations', () => {
+  async function renderLoaded() {
+    vi.mocked(sheetsApi.readMemberProfiles).mockResolvedValue([]);
+    vi.mocked(sheetsApi.readSheetData).mockResolvedValue(makeSheetData());
+    render(
+      <AppProvider>
+        <MutationConsumer />
+      </AppProvider>
+    );
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+    expect(screen.getByTestId('count')).toHaveTextContent('1');
+  }
+
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue(authValue());
+    vi.useFakeTimers();
+    localStorage.setItem('slopwise_spreadsheet_id', 'sheet123');
+    localStorage.setItem('slopwise_spreadsheet_name', 'Test Sheet');
+    localStorage.removeItem('slopwise_sheet_metadata_cache');
+    vi.mocked(sheetsApi.updateExpenseInSheet).mockReset();
+    vi.mocked(sheetsApi.deleteExpenseFromSheet).mockReset();
+    vi.mocked(sheetsApi.appendExpense).mockReset();
+    vi.mocked(sheetsApi.appendExpenseMetadataRow).mockReset();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    localStorage.removeItem('slopwise_spreadsheet_id');
+    localStorage.removeItem('slopwise_spreadsheet_name');
+    localStorage.removeItem('slopwise_sheet_metadata_cache');
+    vi.restoreAllMocks();
+  });
+
+  it('updates optimistically, then reports synced with no error', async () => {
+    vi.mocked(sheetsApi.updateExpenseInSheet).mockResolvedValue(undefined);
+    await renderLoaded();
+
+    await act(async () => {
+      screen.getByTestId('update').click();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('desc')).toHaveTextContent('Changed');
+    expect(screen.getByTestId('error')).toHaveTextContent('');
+    expect(screen.getByTestId('syncing')).toHaveTextContent('false');
+    expect(vi.mocked(sheetsApi.updateExpenseInSheet)).toHaveBeenCalledTimes(1);
+    // Previous version is passed so the sheet row can be located by content.
+    expect(
+      vi.mocked(sheetsApi.updateExpenseInSheet).mock.calls[0][1].description
+    ).toBe('Lunch');
+  });
+
+  it('rolls an update back and reports the error when the write fails', async () => {
+    vi.mocked(sheetsApi.updateExpenseInSheet).mockRejectedValue(
+      new Error('boom')
+    );
+    await renderLoaded();
+
+    await act(async () => {
+      screen.getByTestId('update').click();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('desc')).toHaveTextContent('Lunch');
+    expect(screen.getByTestId('error')).toHaveTextContent('boom');
+    expect(screen.getByTestId('syncing')).toHaveTextContent('false');
+  });
+
+  it('restores a deleted expense when the delete fails', async () => {
+    vi.mocked(sheetsApi.deleteExpenseFromSheet).mockRejectedValue(
+      new Error('nope')
+    );
+    await renderLoaded();
+
+    await act(async () => {
+      screen.getByTestId('delete').click();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('count')).toHaveTextContent('1');
+    expect(screen.getByTestId('error')).toHaveTextContent('nope');
+  });
+
+  it('runs sheet writes one at a time, in call order', async () => {
+    const order: string[] = [];
+    let releaseUpdate: (() => void) | undefined;
+    vi.mocked(sheetsApi.updateExpenseInSheet).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          order.push('update:start');
+          releaseUpdate = () => {
+            order.push('update:end');
+            resolve();
+          };
+        })
+    );
+    vi.mocked(sheetsApi.deleteExpenseFromSheet).mockImplementation(async () => {
+      order.push('delete:start');
+    });
+    await renderLoaded();
+
+    await act(async () => {
+      screen.getByTestId('update-and-delete').click();
+    });
+    await flushAll();
+
+    // The delete must wait for the in-flight update.
+    expect(order).toEqual(['update:start']);
+    expect(screen.getByTestId('syncing')).toHaveTextContent('true');
+
+    await act(async () => {
+      releaseUpdate?.();
+    });
+    await flushAll();
+
+    expect(order).toEqual(['update:start', 'update:end', 'delete:start']);
+    expect(screen.getByTestId('syncing')).toHaveTextContent('false');
+  });
+
+  it('keeps the expense when the row is saved but the metadata write fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(sheetsApi.appendExpense).mockResolvedValue(undefined);
+    vi.mocked(sheetsApi.appendExpenseMetadataRow).mockRejectedValue(
+      new Error('meta down')
+    );
+    await renderLoaded();
+
+    await act(async () => {
+      screen.getByTestId('add').click();
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('count')).toHaveTextContent('2');
+    expect(screen.getByTestId('desc')).toHaveTextContent('Coffee');
+    expect(screen.getByTestId('error')).toHaveTextContent(
+      'split details could not be stored'
+    );
+    expect(screen.getByTestId('syncing')).toHaveTextContent('false');
+    expect(vi.mocked(sheetsApi.appendExpense)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sheetsApi.appendExpenseMetadataRow)).toHaveBeenCalledTimes(
+      2
+    );
+  });
+
+  it('drops the optimistic expense when the sheet append itself fails', async () => {
+    vi.mocked(sheetsApi.appendExpense).mockRejectedValue(
+      new Error('sheet down')
+    );
+    await renderLoaded();
+
+    await act(async () => {
+      screen.getByTestId('add').click();
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+
+    expect(screen.getByTestId('count')).toHaveTextContent('1');
+    expect(screen.getByTestId('desc')).not.toHaveTextContent('Coffee');
+    expect(screen.getByTestId('error')).toHaveTextContent('sheet down');
+    expect(
+      vi.mocked(sheetsApi.appendExpenseMetadataRow)
+    ).not.toHaveBeenCalled();
+  });
+
+  it('rolls back only the expense whose write failed', async () => {
+    vi.mocked(sheetsApi.readSheetData).mockResolvedValue(
+      makeSheetData({
+        expenses: [
+          makeSheetData().expenses[0],
+          {
+            ...makeSheetData().expenses[0],
+            id: 'e2',
+            description: 'Dinner'
+          }
+        ]
+      })
+    );
+    let rejectUpdate: ((err: Error) => void) | undefined;
+    vi.mocked(sheetsApi.updateExpenseInSheet).mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectUpdate = reject;
+        })
+    );
+    vi.mocked(sheetsApi.deleteExpenseFromSheet).mockResolvedValue(undefined);
+
+    render(
+      <AppProvider>
+        <MutationConsumer />
+      </AppProvider>
+    );
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    await flushAll();
+
+    await act(async () => {
+      screen.getByTestId('fail-lunch').click();
+      screen.getByTestId('delete-dinner').click();
+    });
+    await flushAll();
+
+    await act(async () => {
+      rejectUpdate?.(new Error('update failed'));
+    });
+    await flushAll();
+
+    // Dinner stays deleted. Lunch returns to its previous description.
+    expect(screen.getByTestId('desc')).toHaveTextContent('Lunch');
+    expect(screen.getByTestId('desc')).not.toHaveTextContent('Dinner');
+    expect(screen.getByTestId('desc')).not.toHaveTextContent('Changed');
+    expect(screen.getByTestId('count')).toHaveTextContent('1');
   });
 });

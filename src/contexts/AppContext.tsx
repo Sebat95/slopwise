@@ -187,6 +187,35 @@ function createInitialAppState(): AppState {
   };
 }
 
+const META_WRITE_WARNING =
+  'Saved, but split details could not be stored. Refresh to check.';
+
+/**
+ * Appends the expense row, then its _expense_meta entry.
+ *
+ * The Expenses row is the source of truth: once it is written the expense
+ * exists, so a failing meta write must not roll the expense back (that left
+ * ghost rows in the sheet and duplicates on re-add). The meta write is tried
+ * twice; returns false if it still failed.
+ */
+async function appendExpenseWithMeta(
+  ssId: string,
+  expense: Expense,
+  members: string[]
+): Promise<boolean> {
+  await sheetsApi.appendExpense(ssId, expense, members);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await sheetsApi.appendExpenseMetadataRow(ssId, expense, members);
+      return true;
+    } catch (err) {
+      console.warn('Failed to write expense metadata', err);
+      if (attempt === 0) await sleep(500);
+    }
+  }
+  return false;
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
   const prevAuthenticatedRef = useRef<boolean | null>(null);
@@ -201,6 +230,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hydratedSpreadsheetIdRef = useRef<string | null>(null);
   const loadDataRef = useRef<() => Promise<void>>(async () => {});
 
+  // Sheet writes that address rows/columns must run one at a time: a delete
+  // shifts every row below it, so overlapping writes could land on the wrong
+  // row. The chain never rejects; each task reports its own failure.
+  const writeQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const pendingWritesRef = useRef(0);
+
   const bootstrapWriteStartedRef = useRef(false);
   const bootstrapWriteInFlightRef = useRef(false);
   const expensesApplyDeferredRef = useRef(false);
@@ -214,6 +249,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, isBootstrapSettled: true }));
     for (const resolve of bootstrapSettledWaitersRef.current) resolve();
     bootstrapSettledWaitersRef.current = [];
+  }, []);
+
+  const enqueueWrite = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
+    pendingWritesRef.current += 1;
+    const run = writeQueueRef.current.then(task);
+    writeQueueRef.current = run
+      .catch(() => {})
+      .then(() => {
+        pendingWritesRef.current -= 1;
+        // Only clear the indicator once the whole queue has drained.
+        if (pendingWritesRef.current === 0) {
+          setState((s) => (s.isSyncing ? { ...s, isSyncing: false } : s));
+        }
+      });
+    return run;
   }, []);
 
   const resetBootstrapState = useCallback(() => {
@@ -516,13 +566,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
 
       try {
-        await sheetsApi.appendExpense(ssId, newExpense, current.members);
-        await sheetsApi.appendExpenseMetadataRow(
-          ssId,
-          newExpense,
-          current.members
+        const metaSaved = await enqueueWrite(() =>
+          appendExpenseWithMeta(ssId, newExpense, current.members)
         );
-        setState((s) => ({ ...s, isSyncing: false, error: null }));
+        setState((s) => ({
+          ...s,
+          error: metaSaved ? null : META_WRITE_WARNING
+        }));
         if (isBootstrapWrite) {
           finishBootstrapWrite();
         }
@@ -533,14 +583,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const message = getErrorMessage(err, 'Failed to save expense');
         setState((s) => ({
           ...s,
-          isSyncing: false,
           error: message,
           expenses: s.expenses.filter((e) => e.id !== newExpense.id)
         }));
         throw err instanceof Error ? err : new Error(message);
       }
     },
-    [finishBootstrapWrite, waitForBootstrapSettled]
+    [enqueueWrite, finishBootstrapWrite, waitForBootstrapSettled]
   );
 
   const updateExpense = useCallback(
@@ -554,8 +603,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const idx = current.expenses.findIndex((e) => e.id === expenseId);
       if (idx < 0) throw new Error('Expense not found');
 
+      const previous = current.expenses[idx];
       const updatedExpense: Expense = { ...updated, id: expenseId };
-      const backup = [...current.expenses];
 
       setState((s) => ({
         ...s,
@@ -567,63 +616,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
 
       try {
-        await sheetsApi.updateExpenseRow(
-          ssId,
-          idx,
-          updatedExpense,
-          current.members
+        await enqueueWrite(() =>
+          sheetsApi.updateExpenseInSheet(
+            ssId,
+            previous,
+            updatedExpense,
+            current.members,
+            idx
+          )
         );
-        await sheetsApi.updateExpenseMetadataRow(
-          ssId,
-          idx,
-          updatedExpense,
-          current.members
-        );
-        setState((s) => ({ ...s, isSyncing: false, error: null }));
+        setState((s) => ({ ...s, error: null }));
       } catch (err) {
         const message = getErrorMessage(err, 'Failed to update expense');
+        // Roll back only this expense so concurrent edits are not clobbered.
         setState((s) => ({
           ...s,
-          expenses: backup,
-          isSyncing: false,
+          expenses: s.expenses.map((e) => (e.id === expenseId ? previous : e)),
           error: message
         }));
         throw err instanceof Error ? err : new Error(message);
       }
     },
-    [waitForBootstrapSettled]
+    [enqueueWrite, waitForBootstrapSettled]
   );
 
-  const deleteExpense = useCallback(async (expenseId: string) => {
-    const ssId = getSsId();
-    if (!ssId) throw new Error('No spreadsheet selected');
+  const deleteExpense = useCallback(
+    async (expenseId: string) => {
+      const ssId = getSsId();
+      if (!ssId) throw new Error('No spreadsheet selected');
 
-    const current = stateRef.current;
-    const idx = current.expenses.findIndex((e) => e.id === expenseId);
-    if (idx < 0) throw new Error('Expense not found');
+      await waitForBootstrapSettled();
 
-    const backup = [...current.expenses];
-    setState((s) => ({
-      ...s,
-      expenses: s.expenses.filter((e) => e.id !== expenseId),
-      isSyncing: true,
-      error: null
-    }));
+      const current = stateRef.current;
+      const idx = current.expenses.findIndex((e) => e.id === expenseId);
+      if (idx < 0) throw new Error('Expense not found');
 
-    try {
-      await sheetsApi.deleteExpenseRow(ssId, idx);
-      setState((s) => ({ ...s, isSyncing: false, error: null }));
-    } catch (err) {
-      const message = getErrorMessage(err, 'Failed to delete expense');
+      const removed = current.expenses[idx];
       setState((s) => ({
         ...s,
-        expenses: backup,
-        isSyncing: false,
-        error: message
+        expenses: s.expenses.filter((e) => e.id !== expenseId),
+        isSyncing: true,
+        error: null
       }));
-      throw err instanceof Error ? err : new Error(message);
-    }
-  }, []);
+
+      try {
+        await enqueueWrite(() =>
+          sheetsApi.deleteExpenseFromSheet(ssId, removed, idx)
+        );
+        setState((s) => ({ ...s, error: null }));
+      } catch (err) {
+        const message = getErrorMessage(err, 'Failed to delete expense');
+        // Put the expense back where it was (only this one).
+        setState((s) => {
+          if (s.expenses.some((e) => e.id === expenseId)) {
+            return { ...s, error: message };
+          }
+          const restored = [...s.expenses];
+          restored.splice(Math.min(idx, restored.length), 0, removed);
+          return { ...s, expenses: restored, error: message };
+        });
+        throw err instanceof Error ? err : new Error(message);
+      }
+    },
+    [enqueueWrite, waitForBootstrapSettled]
+  );
 
   const addMember = useCallback(async (name: string) => {
     const ssId = getSsId();
@@ -867,25 +923,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
 
       try {
-        await sheetsApi.appendExpense(ssId, settlement, current.members);
-        await sheetsApi.appendExpenseMetadataRow(
-          ssId,
-          settlement,
-          current.members
+        const metaSaved = await enqueueWrite(() =>
+          appendExpenseWithMeta(ssId, settlement, current.members)
         );
-        setState((s) => ({ ...s, isSyncing: false, error: null }));
+        setState((s) => ({
+          ...s,
+          error: metaSaved ? null : META_WRITE_WARNING
+        }));
       } catch (err) {
         const message = getErrorMessage(err, 'Failed to save settlement');
         setState((s) => ({
           ...s,
-          isSyncing: false,
           error: message,
           expenses: s.expenses.filter((e) => e.id !== settlement.id)
         }));
         throw err instanceof Error ? err : new Error(message);
       }
     },
-    []
+    [enqueueWrite]
   );
 
   const renameSheet = useCallback(async (newName: string) => {

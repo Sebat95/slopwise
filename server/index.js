@@ -29,11 +29,13 @@ const TOKEN_ENCRYPTION_KEY = parseEncryptionKey(
 initializeApp();
 
 class HttpError extends Error {
-  constructor(status, code, message, cause) {
+  constructor(status, code, message, cause, detail) {
     super(message);
     this.status = status;
     this.code = code;
     this.cause = cause;
+    // Safe-to-expose upstream explanation (e.g. Google's own error message).
+    this.detail = detail;
   }
 }
 
@@ -583,20 +585,14 @@ function isAbortOrTimeoutError(error) {
   return false;
 }
 
-async function mapGoogleApiError(response) {
-  let responseBody = null;
-  try {
-    responseBody = await response.json();
-  } catch {
-    responseBody = null;
-  }
-
+function buildGoogleApiError(response, responseBody, detail) {
   if (response.status === 400) {
     return new HttpError(
       400,
       'google_bad_request',
       'Google rejected that request.',
-      responseBody
+      responseBody,
+      detail
     );
   }
   if (response.status === 401) {
@@ -604,7 +600,8 @@ async function mapGoogleApiError(response) {
       401,
       'reauth_required',
       'Your Google session expired. Please sign in again.',
-      responseBody
+      responseBody,
+      detail
     );
   }
   if (response.status === 403) {
@@ -612,7 +609,8 @@ async function mapGoogleApiError(response) {
       403,
       'google_forbidden',
       'Google denied access to that spreadsheet operation.',
-      responseBody
+      responseBody,
+      detail
     );
   }
   if (response.status === 404) {
@@ -620,7 +618,8 @@ async function mapGoogleApiError(response) {
       404,
       'google_not_found',
       'The requested Google resource was not found.',
-      responseBody
+      responseBody,
+      detail
     );
   }
   if (response.status === 429) {
@@ -628,7 +627,8 @@ async function mapGoogleApiError(response) {
       429,
       'google_rate_limited',
       'Google API rate limits were exceeded. Try again shortly.',
-      responseBody
+      responseBody,
+      detail
     );
   }
 
@@ -636,8 +636,31 @@ async function mapGoogleApiError(response) {
     502,
     'google_upstream_error',
     'Google API is temporarily unavailable.',
-    responseBody
+    responseBody,
+    detail
   );
+}
+
+async function mapGoogleApiError(response, proxyRequest) {
+  let responseBody = null;
+  try {
+    responseBody = await response.json();
+  } catch {
+    responseBody = null;
+  }
+
+  const googleMessage =
+    typeof responseBody?.error?.message === 'string'
+      ? responseBody.error.message
+      : '';
+  const detail = googleMessage ? googleMessage.slice(0, 300) : undefined;
+
+  // Without this, 4xx failures from Google were invisible in the server logs.
+  console.warn(
+    `[${new Date().toISOString()}] Google API ${response.status} for ${proxyRequest.method} ${new URL(proxyRequest.url).pathname}: ${googleMessage || '(no message)'}`
+  );
+
+  return buildGoogleApiError(response, responseBody, detail);
 }
 
 function logServerError(error, req) {
@@ -655,7 +678,8 @@ function sendErrorResponse(error, req, res) {
     res.status(error.status).json({
       error: {
         code: error.code,
-        message: error.message
+        message: error.message,
+        ...(error.detail ? { detail: error.detail } : {})
       }
     });
     return;
@@ -799,33 +823,45 @@ app.post('/api/googleProxy', googleProxyRateLimiter, async (req, res) => {
   try {
     const session = await requireSession(req, res);
     const proxyRequest = parseProxyRequest(req.body);
-    const accessToken = await getGoogleAccessTokenForUser(session.uid);
+    let accessToken = await getGoogleAccessTokenForUser(session.uid);
 
-    let upstreamResponse;
-    try {
-      upstreamResponse = await fetch(proxyRequest.url, {
-        method: proxyRequest.method,
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: proxyRequest.body,
-        signal: AbortSignal.timeout(GOOGLE_PROXY_TIMEOUT_MS)
-      });
-    } catch (error) {
-      if (isAbortOrTimeoutError(error)) {
-        throw new HttpError(
-          504,
-          'google_proxy_timeout',
-          'Google took too long to respond. Try again.',
-          error
-        );
+    const callGoogle = async (token) => {
+      try {
+        return await fetch(proxyRequest.url, {
+          method: proxyRequest.method,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: proxyRequest.body,
+          signal: AbortSignal.timeout(GOOGLE_PROXY_TIMEOUT_MS)
+        });
+      } catch (error) {
+        if (isAbortOrTimeoutError(error)) {
+          throw new HttpError(
+            504,
+            'google_proxy_timeout',
+            'Google took too long to respond. Try again.',
+            error
+          );
+        }
+        throw error;
       }
-      throw error;
+    };
+
+    let upstreamResponse = await callGoogle(accessToken);
+
+    // A cached access token can be rejected before its expiry (revoked, clock
+    // skew). Refresh once and replay instead of signing the user out. Safe for
+    // any method: Google rejected the call before processing it.
+    if (upstreamResponse.status === 401) {
+      googleAccessTokenCache.delete(session.uid);
+      accessToken = await getGoogleAccessTokenForUser(session.uid);
+      upstreamResponse = await callGoogle(accessToken);
     }
 
     if (!upstreamResponse.ok) {
-      throw await mapGoogleApiError(upstreamResponse);
+      throw await mapGoogleApiError(upstreamResponse, proxyRequest);
     }
 
     const responseText = await upstreamResponse.text();

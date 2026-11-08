@@ -159,35 +159,117 @@ function columnLetter(index: number): string {
 }
 
 interface ApiErrorResponse {
-  error?: { message?: string } | string;
+  error?: { message?: string; detail?: string } | string;
 }
 
-async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}/googleProxy`, {
-    method: 'POST',
-    credentials: 'include',
-    cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      url,
-      method: options?.method || 'GET',
-      body: typeof options?.body === 'string' ? options.body : null
-    })
-  });
-  if (!res.ok) {
+/** Error thrown for non-2xx proxy responses; keeps the HTTP status for callers. */
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** Backoff between attempts for transient failures (one entry per retry). */
+let retryDelaysMs = [400, 1200, 2500];
+
+/** Test hook: override (or zero out) the retry backoff. */
+export function setApiRetryDelaysForTests(delays: number[]): void {
+  retryDelaysMs = delays;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientStatus(status: number): boolean {
+  return (
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
+}
+
+interface ApiRequestOptions {
+  /**
+   * Safe to replay after an ambiguous failure (network error / 5xx).
+   * Defaults to true for GET and PUT. Non-idempotent requests (append, row
+   * deletion) are only replayed on 429, where Google rejected them upfront.
+   */
+  idempotent?: boolean;
+}
+
+/**
+ * Calls the Google proxy. Transient failures (network errors, 429, 5xx) are
+ * retried with backoff so a flaky connection or a Google hiccup does not
+ * surface as a "sync error". Replays are limited to idempotent requests so a
+ * retry can never duplicate an append or delete a second row.
+ */
+async function apiRequest<T>(
+  url: string,
+  options?: RequestInit,
+  requestOptions?: ApiRequestOptions
+): Promise<T> {
+  const method = options?.method || 'GET';
+  const idempotent =
+    requestOptions?.idempotent ?? (method === 'GET' || method === 'PUT');
+
+  for (let attempt = 0; ; attempt++) {
+    const canRetry = attempt < retryDelaysMs.length;
+
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/googleProxy`, {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          method,
+          body: typeof options?.body === 'string' ? options.body : null
+        })
+      });
+    } catch (err) {
+      if (idempotent && canRetry) {
+        await sleep(retryDelaysMs[attempt]);
+        continue;
+      }
+      throw err;
+    }
+
+    if (res.ok) return res.json() as Promise<T>;
+
     if (res.status === 401) {
       notifySessionExpired();
     }
+    const retryable =
+      canRetry &&
+      (res.status === 429 || (idempotent && isTransientStatus(res.status)));
+    if (retryable) {
+      await sleep(retryDelaysMs[attempt]);
+      continue;
+    }
+
     const body: ApiErrorResponse = await res
       .json()
       .catch(() => ({ error: { message: res.statusText } }));
-    const message =
+    const baseMessage =
       typeof body.error === 'string'
         ? body.error
         : body.error?.message || `API error: ${res.status}`;
-    throw new Error(message);
+    const detail =
+      typeof body.error === 'object' ? body.error?.detail : undefined;
+    throw new ApiError(
+      detail ? `${baseMessage} (${detail})` : baseMessage,
+      res.status
+    );
   }
-  return res.json() as Promise<T>;
 }
 
 export async function listSpreadsheets(): Promise<SpreadsheetInfo[]> {
@@ -332,6 +414,19 @@ export async function getSpreadsheetInfo(
   };
 }
 
+/** Member columns (name + sheet column index) from the Expenses header row. */
+function getMemberColumns(
+  headers: string[]
+): Array<{ name: string; colIndex: number }> {
+  return headers
+    .slice(FIXED_COLUMNS)
+    .map((name, idx) => ({
+      name: (name || '').trim(),
+      colIndex: FIXED_COLUMNS + idx
+    }))
+    .filter((c) => c.name.length > 0);
+}
+
 export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
   const lastCol = columnLetter(FIXED_COLUMNS + 50);
   const [expenseData, settingsData, expenseMetaRows] = await Promise.all([
@@ -372,14 +467,7 @@ export async function readSheetData(spreadsheetId: string): Promise<SheetData> {
     if (paidRow?.[1]) lastPaidBy = paidRow[1];
   }
 
-  const headers = expenseData.values?.[0] || [];
-  const memberColumns = headers
-    .slice(FIXED_COLUMNS)
-    .map((name, idx) => ({
-      name: (name || '').trim(),
-      colIndex: FIXED_COLUMNS + idx
-    }))
-    .filter((c) => c.name.length > 0);
+  const memberColumns = getMemberColumns(expenseData.values?.[0] || []);
   const memberNames = memberColumns.map((c) => c.name);
   const expenseMetaQueues = buildExpenseMetaQueues(expenseMetaRows);
 
@@ -550,21 +638,6 @@ export async function renameMemberColumn(
   );
 }
 
-export async function updateExpenseRow(
-  spreadsheetId: string,
-  rowIndex: number,
-  expense: Expense,
-  members: string[]
-): Promise<void> {
-  const row = expenseToRow(expense, members);
-  const rowNum = rowIndex + 2;
-  const lastCol = columnLetter(row.length - 1);
-  await apiRequest<unknown>(
-    `${SHEETS_API}/${spreadsheetId}/values/Expenses!A${rowNum}:${lastCol}${rowNum}?valueInputOption=USER_ENTERED`,
-    { method: 'PUT', body: JSON.stringify({ values: [row] }) }
-  );
-}
-
 function expenseToMetaValueRow(expense: Expense, members: string[]): string[] {
   return [
     buildExpenseSignatureFromExpense(expense, members),
@@ -589,28 +662,162 @@ export async function appendExpenseMetadataRow(
   );
 }
 
-export async function updateExpenseMetadataRow(
-  spreadsheetId: string,
-  rowIndex: number,
-  expense: Expense,
-  members: string[]
-): Promise<void> {
-  await ensureExpenseMetaSheet(spreadsheetId);
-  const rowNum = rowIndex + 2;
-  const row = expenseToMetaValueRow(expense, members);
-  await apiRequest<unknown>(
-    `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A${rowNum}:D${rowNum}?valueInputOption=USER_ENTERED`,
-    { method: 'PUT', body: JSON.stringify({ values: [row] }) }
-  );
+/** Candidate closest to `hint` (1-based sheet row), or null when empty. */
+function pickClosestRow(candidates: number[], hint: number): number | null {
+  let best: number | null = null;
+  for (const candidate of candidates) {
+    if (best === null || Math.abs(candidate - hint) < Math.abs(best - hint)) {
+      best = candidate;
+    }
+  }
+  return best;
 }
 
-export async function deleteExpenseRow(
+interface ExpenseRowLocation {
+  /** 1-based row number in the Expenses sheet. */
+  expenseRow: number;
+  /** 1-based row number in _expense_meta, or null when it has no entry. */
+  metaRow: number | null;
+}
+
+/**
+ * Finds where an expense currently lives in the sheet.
+ *
+ * Rows are matched by content signature (the same one used to join
+ * _expense_meta on read), NOT by position in the in-memory list. Positions
+ * drift whenever the sheet contains blank/skipped rows, expenses without a
+ * meta entry, or edits made outside the app, which used to make updates and
+ * deletes hit the wrong row. `hintIndex` (the expense's index in memory) only
+ * breaks ties between identical rows.
+ */
+async function locateExpenseRows(
   spreadsheetId: string,
-  rowIndex: number
+  expense: Expense,
+  hintIndex: number
+): Promise<ExpenseRowLocation> {
+  const lastCol = columnLetter(FIXED_COLUMNS + 50);
+  const [expenseData, metaData] = await Promise.all([
+    apiRequest<{ values?: string[][] }>(
+      `${SHEETS_API}/${spreadsheetId}/values/Expenses!A1:${lastCol}${MAX_ROWS}`
+    ),
+    apiRequest<{ values?: string[][] }>(
+      `${SHEETS_API}/${spreadsheetId}/values/${EXPENSE_META_SHEET}!A1:A${MAX_ROWS}`
+    ).catch((err: unknown) => {
+      // A missing meta tab is fine; anything else (network, quota) is not.
+      if (err instanceof ApiError && (err.status === 400 || err.status === 404))
+        return { values: undefined };
+      throw err;
+    })
+  ]);
+
+  const rows = expenseData.values ?? [];
+  const memberColumns = getMemberColumns(rows[0] || []);
+  const memberNames = memberColumns.map((c) => c.name);
+  const signature = buildExpenseSignatureFromExpense(expense, memberNames);
+  const hintRow = hintIndex + 2;
+
+  const rowCandidates: number[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row[0]) continue;
+    if (
+      buildExpenseSignatureFromRow(row, memberColumns, expense.currency) ===
+      signature
+    ) {
+      rowCandidates.push(i + 1);
+    }
+  }
+
+  let expenseRow = pickClosestRow(rowCandidates, hintRow);
+  if (expenseRow === null) {
+    // Signature can differ when Sheets reformats a cell (e.g. date display).
+    // Accept the positional row only if its description and cost still agree.
+    const row = rows[hintRow - 1];
+    if (
+      row &&
+      (row[1] || '').trim() === (expense.description || '').trim() &&
+      parseSheetMoneyCents(row[3] || '0') === Math.trunc(expense.cost)
+    ) {
+      expenseRow = hintRow;
+    }
+  }
+  if (expenseRow === null) {
+    throw new Error(
+      'This expense was not found in the sheet. Refresh and try again.'
+    );
+  }
+
+  const metaRows = metaData.values ?? [];
+  const metaCandidates: number[] = [];
+  for (let i = 1; i < metaRows.length; i++) {
+    if (metaRows[i]?.[0]?.trim() === signature) metaCandidates.push(i + 1);
+  }
+
+  return { expenseRow, metaRow: pickClosestRow(metaCandidates, hintRow) };
+}
+
+/**
+ * Rewrites an existing expense (and its _expense_meta entry) in place.
+ *
+ * Both ranges are written with a single values:batchUpdate so the update is
+ * atomic: it either fully applies or not at all, instead of leaving the
+ * Expenses row updated while the meta write fails.
+ */
+export async function updateExpenseInSheet(
+  spreadsheetId: string,
+  previous: Expense,
+  updated: Expense,
+  members: string[],
+  hintIndex: number
 ): Promise<void> {
-  const sheetInfo = await apiRequest<{
-    sheets: Array<{ properties: { sheetId: number; title: string } }>;
-  }>(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`);
+  await ensureExpenseMetaSheet(spreadsheetId);
+  const location = await locateExpenseRows(spreadsheetId, previous, hintIndex);
+
+  const row = expenseToRow(updated, members);
+  const lastCol = columnLetter(row.length - 1);
+  const data: Array<{ range: string; values: string[][] }> = [
+    {
+      range: `Expenses!A${location.expenseRow}:${lastCol}${location.expenseRow}`,
+      values: [row]
+    }
+  ];
+  if (location.metaRow !== null) {
+    data.push({
+      range: `${EXPENSE_META_SHEET}!A${location.metaRow}:D${location.metaRow}`,
+      values: [expenseToMetaValueRow(updated, members)]
+    });
+  }
+
+  await apiRequest<unknown>(
+    `${SHEETS_API}/${spreadsheetId}/values:batchUpdate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data })
+    },
+    { idempotent: true }
+  );
+
+  // Legacy rows have no meta entry yet: create one so payer/split type persist.
+  if (location.metaRow === null) {
+    await appendExpenseMetadataRow(spreadsheetId, updated, members);
+  }
+}
+
+/**
+ * Deletes an expense and its _expense_meta entry in one atomic batchUpdate.
+ * The target rows are located by content (see locateExpenseRows).
+ */
+export async function deleteExpenseFromSheet(
+  spreadsheetId: string,
+  expense: Expense,
+  hintIndex: number
+): Promise<void> {
+  const [sheetInfo, location] = await Promise.all([
+    apiRequest<{
+      sheets: Array<{ properties: { sheetId: number; title: string } }>;
+    }>(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`),
+    locateExpenseRows(spreadsheetId, expense, hintIndex)
+  ]);
 
   const expensesSheet = sheetInfo.sheets.find(
     (s) => s.properties.title === 'Expenses'
@@ -621,39 +828,22 @@ export async function deleteExpenseRow(
     (s) => s.properties.title === EXPENSE_META_SHEET
   );
 
-  const requests: Array<{
+  const deleteRow = (sheetId: number, row: number) => ({
     deleteDimension: {
       range: {
-        sheetId: number;
-        dimension: 'ROWS';
-        startIndex: number;
-        endIndex: number;
-      };
-    };
-  }> = [
-    {
-      deleteDimension: {
-        range: {
-          sheetId: expensesSheet.properties.sheetId,
-          dimension: 'ROWS',
-          startIndex: rowIndex + 1,
-          endIndex: rowIndex + 2
-        }
+        sheetId,
+        dimension: 'ROWS' as const,
+        startIndex: row - 1,
+        endIndex: row
       }
     }
-  ];
+  });
 
-  if (metaSheet) {
-    requests.push({
-      deleteDimension: {
-        range: {
-          sheetId: metaSheet.properties.sheetId,
-          dimension: 'ROWS',
-          startIndex: rowIndex + 1,
-          endIndex: rowIndex + 2
-        }
-      }
-    });
+  const requests = [
+    deleteRow(expensesSheet.properties.sheetId, location.expenseRow)
+  ];
+  if (metaSheet && location.metaRow !== null) {
+    requests.push(deleteRow(metaSheet.properties.sheetId, location.metaRow));
   }
 
   await apiRequest<unknown>(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {

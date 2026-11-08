@@ -2,14 +2,20 @@ import { Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 
 export default function SyncIndicator() {
-  const { isLoading, isSyncing, error } = useApp();
+  const { isLoading, isSyncing, error, loadData } = useApp();
 
   if (error) {
+    // Tapping re-reads the sheet, which also clears the (sticky) error.
     return (
-      <div className="text-danger flex items-center gap-1.5 text-xs">
+      <button
+        type="button"
+        onClick={() => void loadData()}
+        title={`${error} (tap to refresh)`}
+        className="text-danger flex items-center gap-1.5 text-xs"
+      >
         <CloudOff size={14} />
         <span>Sync error</span>
-      </div>
+      </button>
     );
   }
 
