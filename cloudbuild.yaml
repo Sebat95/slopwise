@@ -13,7 +13,7 @@ availableSecrets:
 steps:
   # Unit + e2e tests before image build; failures stop the pipeline.
   - id: test
-    name: mcr.microsoft.com/playwright:v1.58.2-jammy
+    name: mcr.microsoft.com/playwright:v1.65.0-jammy
     entrypoint: bash
     env:
       - CI=true
