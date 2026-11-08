@@ -236,7 +236,6 @@ export default function AddExpensePage() {
     if (isEdit || hasInitializedNewExpense.current || members.length === 0)
       return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- boot new expense form once members load
     initializeNewExpenseForm();
   }, [initializeNewExpenseForm, isEdit, members.length]);
 

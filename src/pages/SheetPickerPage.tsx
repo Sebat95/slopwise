@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { listSpreadsheets, createSpreadsheet } from '../services/sheets-api';
@@ -39,23 +39,28 @@ export default function SheetPickerPage() {
   const [importing, setImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
 
-  const fetchSheets = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await listSpreadsheets();
-      setSheets(data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to list spreadsheets'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchSheets();
-  }, [fetchSheets]);
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const data = await listSpreadsheets();
+        if (!cancelled) setSheets(data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : 'Failed to list spreadsheets'
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSelect = async (sheet: SpreadsheetInfo) => {
     setLoading(true);
